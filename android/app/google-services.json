@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "861998689774",
+    "project_id": "dawa4all-5ded7",
+    "storage_bucket": "dawa4all-5ded7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:861998689774:android:aa2c3a138aea2cc68672ff",
+        "android_client_info": {
+          "package_name": "com.example.dawa4all"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAueY8xpZiEpBP02CVC_DsFn-Mb_XTDgHw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
