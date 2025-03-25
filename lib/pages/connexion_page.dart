@@ -1,7 +1,62 @@
 import 'package:flutter/material.dart';
 
-class ConnexionPage extends StatelessWidget {
-  const ConnexionPage({Key? key}) : super(key: key);
+import '../services/medicament_service.dart';
+
+class ConnexionPage extends StatefulWidget  {
+  const ConnexionPage({super.key});
+
+  @override
+  _ConnexionPageState createState() => _ConnexionPageState();
+}
+
+class _ConnexionPageState extends State<ConnexionPage> {
+  // Ajouter les contrôleurs pour les champs de texte
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+  final MedicamentService _service = MedicamentService();
+  bool _isLoading = false;
+  bool _obscurePassword = true;
+
+  void _login() async {
+    final username = _usernameController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (username.isEmpty || password.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Veuillez remplir tous les champs')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      // Si c'est l'admin
+      if (username == 'admin' && password == 'Passer123') {
+        _service.setAuth(username, password);
+        setState(() {
+          _isLoading = false;
+        });
+        Navigator.pushReplacementNamed(context, '/accueil', arguments: {'isAdmin': true});
+      } else {
+        // Pour un utilisateur normal, pas besoin d'authentification
+        _service.clearAuth();
+        setState(() {
+          _isLoading = false;
+        });
+        Navigator.pushReplacementNamed(context, '/accueil', arguments: {'isAdmin': false});
+      }
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur de connexion: $e')),
+      );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +108,7 @@ class ConnexionPage extends StatelessWidget {
                           const SizedBox(height: 50), // Espace pour le logo
                           // Champ d'email ou nom d'utilisateur
                           TextField(
+                            controller: _usernameController,
                             decoration: InputDecoration(
                               hintText: 'Email ou Nom d’utilisateur',
                               prefixIcon: const Icon(
@@ -70,12 +126,24 @@ class ConnexionPage extends StatelessWidget {
                           const SizedBox(height: 20),
                           // Champ de mot de passe
                           TextField(
-                            obscureText: true,
+                            controller: _passwordController,
+                            obscureText: _obscurePassword,
                             decoration: InputDecoration(
                               hintText: 'Mot de passe',
                               prefixIcon: const Icon(
                                 Icons.lock,
                                 color: Colors.green,
+                              ),
+                              suffixIcon: IconButton(
+                                icon: Icon(
+                                  _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                                  color: Colors.grey,
+                                ),
+                                onPressed: () {
+                                  setState(() {
+                                    _obscurePassword = !_obscurePassword;
+                                  });
+                                },
                               ),
                               filled: true,
                               fillColor: Colors.grey[100],
@@ -130,9 +198,7 @@ class ConnexionPage extends StatelessWidget {
                         borderRadius: BorderRadius.circular(20),
                       ),
                     ),
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/accueil');
-                    },
+                    onPressed: _login,
                     child: const Text(
                       'SE CONNECTER',
                       style: TextStyle(
@@ -160,7 +226,9 @@ class ConnexionPage extends StatelessWidget {
                 // Lien pour passer
                 TextButton(
                   onPressed: () {
-                    Navigator.pushNamed(context, '/accueil');
+                    // Mettre à jour pour accéder en tant qu'utilisateur normal
+                    _service.clearAuth();
+                    Navigator.pushReplacementNamed(context, '/accueil', arguments: {'isAdmin': false});
                   },
                   child: const Text(
                     'Passer pour le moment ➔',
@@ -176,5 +244,12 @@ class ConnexionPage extends StatelessWidget {
         ),
       ),
     );
+  }
+  @override
+  void dispose() {
+    // Libérer les ressources des contrôleurs
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 }

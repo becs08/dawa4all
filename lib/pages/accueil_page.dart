@@ -1,4 +1,3 @@
-import 'package:dawa4all/pages/panier_page.dart';
 import 'package:dawa4all/pages/panier_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:dawa4all/pages/produit_page.dart';
@@ -17,6 +16,15 @@ class _AccueilPageState extends State<AccueilPage> {
   int _selectedIndex = 0;
   String _selectedCategory = 'Tout';
   String _searchQuery = '';
+  bool _isAdmin = false;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Récupérer l'état admin des arguments
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    _isAdmin = args?['isAdmin'] ?? false;
+  }
 
   List<Map<String, String>> get _filteredProduits {
     List<Map<String, String>> filteredList = PopulairePage.produitsPopulaires;
@@ -43,9 +51,14 @@ class _AccueilPageState extends State<AccueilPage> {
 
     switch (index) {
       case 1:
-        Navigator.pushNamed(context, '/listeProduits');
+        Navigator.pushNamed(context, '/listeProduits', arguments: {'isAdmin': _isAdmin});
+        break;
       case 2:
-        Navigator.pushNamed(context, '/panier');
+        if (_isAdmin) {
+          Navigator.pushNamed(context, '/admin/gestion_medicaments');
+        } else {
+          Navigator.pushNamed(context, '/panier');
+        }
         break;
     }
   }
@@ -174,16 +187,21 @@ class _AccueilPageState extends State<AccueilPage> {
         onTap: _onItemTapped,
         selectedItemColor: Colors.greenAccent,
         unselectedItemColor: Colors.white,
-        items: const [
-          BottomNavigationBarItem(
+        items: [
+          const BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Accueil',
           ),
-          BottomNavigationBarItem(
+          const BottomNavigationBarItem(
             icon: Icon(Icons.medication_outlined),
             label: 'Liste',
           ),
-          BottomNavigationBarItem(
+          _isAdmin
+              ? const BottomNavigationBarItem(
+            icon: Icon(Icons.admin_panel_settings),
+            label: 'Gestion',
+          )
+              : const BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart),
             label: 'Panier',
           ),

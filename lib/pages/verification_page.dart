@@ -29,7 +29,7 @@ class VerificationPage extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
                   _buildStepIndicator('Panier', true),
-                  _buildStepIndicator('Vérification', true),
+                  _buildStepIndicator('Vérification', false),
                   _buildStepIndicator('Paiement', false),
                 ],
               ),
