@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dawa4all/pages/panier_provider.dart';
+import '../models/medicament_model.dart';
+import '../services/medicament_service.dart';
 
 class ProduitPage extends StatefulWidget {
   final String nomProduit;
   final String imageProduit;
   final String prixAncien;
   final String prixNouveau;
+  final String? id; // ID du produit, optionnel
 
   const ProduitPage({
     super.key,
@@ -14,6 +17,7 @@ class ProduitPage extends StatefulWidget {
     required this.imageProduit,
     required this.prixAncien,
     required this.prixNouveau,
+    this.id,
   });
 
   @override
@@ -22,6 +26,52 @@ class ProduitPage extends StatefulWidget {
 
 class _ProduitPageState extends State<ProduitPage> {
   int quantite = 1;
+  bool _isAdmin = false;
+  final MedicamentService _service = MedicamentService();
+  bool _isLoading = false;
+  String? _description;
+  String _categorie = 'Adulte';
+  int _stockQuantite = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.id != null) {
+      _loadMedicamentDetails();
+    }
+  }
+
+  Future<void> _loadMedicamentDetails() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final medicament = await _service.getMedicament(widget.id!);
+      setState(() {
+        _description = medicament.description;
+        _categorie = medicament.categorie;
+        _stockQuantite = medicament.quantite;
+      });
+    } catch (e) {
+      // En cas d'erreur, on utilise les valeurs par défaut
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Impossible de charger les détails du produit')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Récupérer l'état admin des arguments
+    final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+    _isAdmin = args?['isAdmin'] ?? false;
+  }
 
   void incrementerQuantite() {
     setState(() {
@@ -67,6 +117,56 @@ class _ProduitPageState extends State<ProduitPage> {
     );
   }
 
+  void modifierProduit() {
+    // Créer un objet Medicament à partir des données
+    final medicament = Medicament(
+      id: widget.id,
+      nom: widget.nomProduit,
+      image: widget.imageProduit,
+      prixAncien: widget.prixAncien,
+      prixNouveau: widget.prixNouveau,
+      categorie: _categorie,
+      quantite: _stockQuantite,
+      description: _description ?? 'Description non disponible',
+    );
+
+    // Naviguer vers le formulaire d'édition
+    Navigator.pushNamed(
+      context,
+      '/admin/editer_medicament',
+      arguments: medicament,
+    );
+  }
+
+  Future<void> supprimerProduit() async {
+    if (widget.id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Impossible de supprimer ce produit')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _service.deleteMedicament(widget.id!);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${widget.nomProduit} supprimé avec succès')),
+      );
+      Navigator.pop(context); // Retourner à la liste
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Erreur lors de la suppression: $e')),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -83,7 +183,9 @@ class _ProduitPageState extends State<ProduitPage> {
           ],
         ),
       ),
-      body: SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16.0),
           child: Column(
@@ -92,7 +194,13 @@ class _ProduitPageState extends State<ProduitPage> {
               Center(
                 child: Stack(
                   children: [
-                    Image.asset(
+                    widget.imageProduit.startsWith('http')
+                        ? Image.network(
+                      widget.imageProduit,
+                      height: 200,
+                      fit: BoxFit.cover,
+                    )
+                        : Image.asset(
                       widget.imageProduit,
                       height: 200,
                       fit: BoxFit.cover,
@@ -155,48 +263,81 @@ class _ProduitPageState extends State<ProduitPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.start,
-                children: [
-                  const Text(
-                    'Quantité: ',
-                    style: TextStyle(fontSize: 16),
+              const SizedBox(height: 8),
+              // Afficher la catégorie
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.green.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _categorie,
+                  style: TextStyle(
+                    color: Colors.green.shade900,
+                    fontWeight: FontWeight.bold,
                   ),
-                  const SizedBox(width: 8),
-                  Row(
-                    children: [
-                      IconButton(
-                        onPressed: decrementerQuantite,
-                        icon: const Icon(Icons.remove),
-                        color: Colors.green.shade900,
-                      ),
-                      Text(
-                        '$quantite',
-                        style: const TextStyle(fontSize: 16),
-                      ),
-                      IconButton(
-                        onPressed: incrementerQuantite,
-                        icon: const Icon(Icons.add),
-                        color: Colors.green.shade900,
-                      ),
-                    ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              // Afficher la quantité en stock
+              Row(
+                children: [
+                  const Icon(Icons.inventory, color: Colors.blue),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Stock disponible: $_stockQuantite',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ],
               ),
+              const SizedBox(height: 16),
+              // Afficher la sélection de quantité uniquement pour les utilisateurs normaux
+              if (!_isAdmin)
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Quantité: ',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(width: 8),
+                    Row(
+                      children: [
+                        IconButton(
+                          onPressed: decrementerQuantite,
+                          icon: const Icon(Icons.remove),
+                          color: Colors.green.shade900,
+                        ),
+                        Text(
+                          '$quantite',
+                          style: const TextStyle(fontSize: 16),
+                        ),
+                        IconButton(
+                          onPressed: incrementerQuantite,
+                          icon: const Icon(Icons.add),
+                          color: Colors.green.shade900,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               const SizedBox(height: 16),
               Row(
                 children: [
                   Expanded(
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.green.shade900,
+                        backgroundColor: _isAdmin ? Colors.blue : Colors.green.shade900,
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      onPressed: ajouterAuPanier,
-                      child: const Text(
-                        'Ajouter au panier',
-                        style: TextStyle(
+                      onPressed: _isAdmin ? modifierProduit : ajouterAuPanier,
+                      child: Text(
+                        _isAdmin ? 'Modifier le produit' : 'Ajouter au panier',
+                        style: const TextStyle(
                           fontSize: 16,
                           color: Colors.white,
                         ),
@@ -204,29 +345,63 @@ class _ProduitPageState extends State<ProduitPage> {
                     ),
                   ),
                   const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/panier');
-                    },
-                    icon: const Icon(Icons.shopping_cart),
-                    color: Colors.green.shade900,
-                    iconSize: 28,
-                    tooltip: 'Voir le panier',
-                  ),
+                  if (!_isAdmin) // Afficher le bouton panier uniquement pour les utilisateurs normaux
+                    IconButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/panier');
+                      },
+                      icon: const Icon(Icons.shopping_cart),
+                      color: Colors.green.shade900,
+                      iconSize: 28,
+                      tooltip: 'Voir le panier',
+                    ),
+                  if (_isAdmin) // Afficher le bouton de suppression pour les admins
+                    IconButton(
+                      onPressed: () {
+                        // Afficher une boîte de dialogue de confirmation
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Confirmation'),
+                            content: Text('Voulez-vous vraiment supprimer ${widget.nomProduit}?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Annuler'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  Navigator.pop(context);
+                                  supprimerProduit();
+                                },
+                                child: const Text('Supprimer'),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.red,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.delete),
+                      color: Colors.red,
+                      iconSize: 28,
+                      tooltip: 'Supprimer le produit',
+                    ),
                 ],
               ),
               const SizedBox(height: 16),
-              const Row(
+              Row(
                 children: [
                   Icon(
-                    Icons.check_circle,
-                    color: Colors.green,
+                    _stockQuantite > 0 ? Icons.check_circle : Icons.cancel,
+                    color: _stockQuantite > 0 ? Colors.green : Colors.red,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Text(
-                    'Disponible en stock',
+                    _stockQuantite > 0 ? 'Disponible en stock' : 'Rupture de stock',
                     style: TextStyle(
-                      color: Colors.green,
+                      color: _stockQuantite > 0 ? Colors.green : Colors.red,
                       fontSize: 16,
                     ),
                   ),
@@ -246,11 +421,11 @@ class _ProduitPageState extends State<ProduitPage> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '
+              Text(
+                _description ?? 'Lorem ipsum dolor sit amet, consectetur adipiscing elit. '
                     'Sed diam nunc, viverra non interdum nec, aliquet luctus ligula. '
                     'Integer aliquam erat vel turpis laoreet, vel viverra erat blandit.',
-                style: TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: 14),
               ),
             ],
           ),

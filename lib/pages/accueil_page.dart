@@ -254,6 +254,10 @@ class _AccueilPageState extends State<AccueilPage> {
               prixAncien: produit['prixAncien']!,
               prixNouveau: produit['prixNouveau']!,
             ),
+            // Passer le statut admin
+            settings: RouteSettings(
+              arguments: {'isAdmin': _isAdmin},
+            ),
           ),
         );
       },
