@@ -13,6 +13,7 @@ class _DashboardPageState extends State<DashboardPage> {
   final MedicamentService _service = MedicamentService();
   bool _isLoading = true;
   Map<String, dynamic> _stats = {};
+  int _selectedIndex = 1; // Index 1 correspond au tableau de bord pour l'admin
 
   @override
   void initState() {
@@ -41,6 +42,28 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    switch (index) {
+      case 0:
+        Navigator.pushReplacementNamed(context, '/accueil', arguments: {'isAdmin': true});
+        break;
+      case 2:
+        Navigator.pushReplacementNamed(context, '/admin/gestion_medicaments');
+        break;
+    }
+  }
+
+  void _logout() {
+    // Nettoyer l'authentification
+    _service.clearAuth();
+    // Rediriger vers la page de connexion
+    Navigator.pushReplacementNamed(context, '/connexion');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -48,6 +71,15 @@ class _DashboardPageState extends State<DashboardPage> {
         title: const Text('Tableau de bord Admin'),
         backgroundColor: Colors.green.shade900,
         foregroundColor: Colors.white,
+        automaticallyImplyLeading: false, // Supprimer le bouton retour
+        actions: [
+          // Ajouter un bouton de déconnexion
+          IconButton(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            tooltip: 'Déconnexion',
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -118,6 +150,28 @@ class _DashboardPageState extends State<DashboardPage> {
             ],
           ),
         ),
+      ),
+      // Ajouter la bottom bar pour l'admin
+      bottomNavigationBar: BottomNavigationBar(
+        backgroundColor: Colors.green.shade900,
+        currentIndex: _selectedIndex,
+        onTap: _onItemTapped,
+        selectedItemColor: Colors.greenAccent,
+        unselectedItemColor: Colors.white,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: 'Accueil',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.analytics),
+            label: 'Tableau de bord',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.admin_panel_settings),
+            label: 'Gestion',
+          ),
+        ],
       ),
     );
   }

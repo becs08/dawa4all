@@ -1,6 +1,7 @@
 import 'package:dawa4all/pages/panier_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../services/medicament_service.dart';
 
 class PanierPage extends StatefulWidget {
   @override
@@ -9,6 +10,7 @@ class PanierPage extends StatefulWidget {
 
 class _PanierPageState extends State<PanierPage> {
   int _selectedIndex = 2;
+  final MedicamentService _service = MedicamentService();
 
   void _onItemTapped(int index) {
     setState(() {
@@ -25,6 +27,13 @@ class _PanierPageState extends State<PanierPage> {
     }
   }
 
+  void _logout() {
+    // Nettoyer l'authentification
+    _service.clearAuth();
+    // Rediriger vers la page de connexion
+    Navigator.pushReplacementNamed(context, '/connexion');
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -32,14 +41,22 @@ class _PanierPageState extends State<PanierPage> {
       appBar: AppBar(
         backgroundColor: Colors.white,
         automaticallyImplyLeading: false,
-        title: Text(
-          'Mon Panier',
-          style: TextStyle(color: Colors.green.shade900),
+        title: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Mon Panier',
+              style: TextStyle(color: Colors.green.shade900),
+            ),
+            // Ajouter un bouton de déconnexion
+            IconButton(
+              onPressed: _logout,
+              icon: const Icon(Icons.logout),
+              color: Colors.green.shade900,
+              tooltip: 'Déconnexion',
+            ),
+          ],
         ),
-        /*leading: IconButton(
-          icon: Icon(Icons.arrow_back, color: Colors.green.shade900),
-          onPressed: () => Navigator.of(context).pop(),
-        ),*/
       ),
       body: Consumer<PanierProvider>(
         builder: (context, panierProvider, child) {
@@ -82,7 +99,14 @@ class _PanierPageState extends State<PanierPage> {
                         padding: const EdgeInsets.all(12),
                         child: Row(
                           children: [
-                            Image.asset(
+                            produit['image'].startsWith('http')
+                                ? Image.network(
+                              produit['image'],
+                              height: 70,
+                              width: 100,
+                              fit: BoxFit.cover,
+                            )
+                                : Image.asset(
                               produit['image'],
                               height: 70,
                               width: 100,
@@ -109,6 +133,14 @@ class _PanierPageState extends State<PanierPage> {
                                       color: Colors.green.shade900,
                                     ),
                                   ),
+                                  if (produit.containsKey('quantite') && produit['quantite'] != null)
+                                    Text(
+                                      "Quantité: ${produit['quantite']}",
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        color: Colors.grey[600],
+                                      ),
+                                    ),
                                 ],
                               ),
                             ),

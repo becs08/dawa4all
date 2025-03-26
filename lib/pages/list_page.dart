@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:dawa4all/pages/panier_provider.dart';
-import '../data/medicament_data.dart';
 import '../models/medicament_model.dart';
 import '../services/medicament_service.dart';
 import 'produit_page.dart';
@@ -38,13 +37,11 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
         _isLoading = false;
       });
     } catch (e) {
-      // En cas d'erreur, utiliser les données locales
       setState(() {
         _isLoading = false;
-        // Les médicaments seront obtenus à partir de ListeMedicaments.medicaments
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Impossible de charger les données depuis le serveur, utilisation des données locales.')),
+        SnackBar(content: Text('Impossible de charger les données depuis le serveur.')),
       );
     }
   }
@@ -55,6 +52,13 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
     // Récupérer l'état admin des arguments
     final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
     _isAdmin = args?['isAdmin'] ?? false;
+
+    // Si c'est un admin, rediriger vers le tableau de bord
+    if (_isAdmin) {
+      Future.microtask(() {
+        Navigator.pushReplacementNamed(context, '/admin/dashboard');
+      });
+    }
   }
 
   void _onItemTapped(int index) {
@@ -67,45 +71,31 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
         Navigator.pushNamed(context, '/accueil', arguments: {'isAdmin': _isAdmin});
         break;
       case 2:
-        if (_isAdmin) {
-          Navigator.pushNamed(context, '/admin/gestion_medicaments');
-        } else {
-          Navigator.pushNamed(context, '/panier');
-        }
+        Navigator.pushNamed(context, '/panier');
         break;
     }
   }
 
-  Future<void> _supprimerMedicament(String id) async {
-    try {
-      await _service.deleteMedicament(id);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Médicament supprimé avec succès')),
-      );
-      _loadMedicaments(); // Recharger la liste
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur lors de la suppression: $e')),
-      );
-    }
+  void _logout() {
+    // Nettoyer l'authentification
+    _service.clearAuth();
+    // Rediriger vers la page de connexion
+    Navigator.pushReplacementNamed(context, '/connexion');
   }
 
   @override
   Widget build(BuildContext context) {
-    // Filtrer les médicaments selon la recherche
-    List<dynamic> produitsFiltres = [];
-
-    if (_medicaments.isNotEmpty) {
-      // Si les médicaments sont chargés depuis l'API
-      produitsFiltres = _medicaments
-          .where((med) => med.nom.toLowerCase().contains(query.toLowerCase()))
-          .toList();
-    } else {
-      // Sinon, utiliser les données locales
-      produitsFiltres = ListeMedicaments.medicaments
-          .where((produit) => produit['nom'].toLowerCase().contains(query.toLowerCase()))
-          .toList();
+    // Si admin, ne pas afficher cette page
+    if (_isAdmin) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
+
+    // Filtrer les médicaments selon la recherche
+    List<Medicament> medicamentsFiltres = _medicaments
+        .where((med) => med.nom.toLowerCase().contains(query.toLowerCase()))
+        .toList();
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -118,22 +108,20 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
             Image.asset('assets/logoAccueil.png', height: 37),
             Row(
               children: [
-                if (!_isAdmin)
-                  IconButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/panier');
-                    },
-                    icon: const Icon(Icons.shopping_cart),
-                    color: Colors.green.shade900,
-                  ),
-                if (_isAdmin)
-                  IconButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/admin/dashboard');
-                    },
-                    icon: const Icon(Icons.dashboard),
-                    color: Colors.green.shade900,
-                  ),
+                IconButton(
+                  onPressed: () {
+                    Navigator.pushNamed(context, '/panier');
+                  },
+                  icon: const Icon(Icons.shopping_cart),
+                  color: Colors.green.shade900,
+                ),
+                // Ajouter un bouton de déconnexion
+                IconButton(
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout),
+                  color: Colors.green.shade900,
+                  tooltip: 'Déconnexion',
+                ),
               ],
             ),
           ],
@@ -169,82 +157,42 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
                 child: CircularProgressIndicator(),
               ),
             )
+          else if (medicamentsFiltres.isEmpty)
+            const Expanded(
+              child: Center(
+                child: Text(
+                  'Aucun médicament trouvé',
+                  style: TextStyle(fontSize: 18),
+                ),
+              ),
+            )
           else
             Expanded(
               child: RefreshIndicator(
                 onRefresh: _loadMedicaments,
                 child: ListView.builder(
                   padding: const EdgeInsets.all(16.0),
-                  itemCount: produitsFiltres.length,
+                  itemCount: medicamentsFiltres.length,
                   itemBuilder: (context, index) {
-                    // Gérer à la fois les données API et locales
-                    dynamic item = produitsFiltres[index];
-
-                    // Variables pour stocker les données du produit
-                    String nom, image, prixAncien, prixNouveau;
-                    String? id;
-
-                    if (item is Medicament) {
-                      // Si l'item est un Medicament (depuis l'API)
-                      id = item.id;
-                      nom = item.nom;
-                      image = item.image;
-                      prixAncien = item.prixAncien;
-                      prixNouveau = item.prixNouveau;
-                    } else {
-                      // Si l'item est un Map (depuis les données locales)
-                      id = index.toString();
-                      nom = item['nom'];
-                      image = item['image'];
-                      prixAncien = item['prixAncien'];
-                      prixNouveau = item['prixNouveau'];
-                    }
+                    final medicament = medicamentsFiltres[index];
 
                     return GestureDetector(
                       onTap: () {
-                        if (_isAdmin) {
-                          // Pour l'admin, naviguer vers la page de détails admin
-                          if (item is Medicament) {
-                            Navigator.pushNamed(
-                              context,
-                              '/admin/details_medicament',
-                              arguments: item,
-                            );
-                          } else {
-                            // Convertir en objet Medicament
-                            final medicament = Medicament(
-                              id: id,
-                              nom: nom,
-                              image: image,
-                              prixAncien: prixAncien,
-                              prixNouveau: prixNouveau,
-                              categorie: item['categorie'] ?? 'Adulte',
-                              quantite: 0,
-                              description: 'Description non disponible',
-                            );
-                            Navigator.pushNamed(
-                              context,
-                              '/admin/details_medicament',
-                              arguments: medicament,
-                            );
-                          }
-                        } else {
-                          // Pour l'utilisateur normal
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => ProduitPage(
-                                nomProduit: nom,
-                                imageProduit: image,
-                                prixAncien: prixAncien,
-                                prixNouveau: prixNouveau,
-                              ),
-                              settings: RouteSettings(
-                                arguments: {'isAdmin': _isAdmin},
-                              ),
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ProduitPage(
+                              nomProduit: medicament.nom,
+                              imageProduit: medicament.image,
+                              prixAncien: medicament.prixAncien,
+                              prixNouveau: medicament.prixNouveau,
+                              id: medicament.id,
                             ),
-                          );
-                        }
+                            settings: RouteSettings(
+                              arguments: {'isAdmin': _isAdmin},
+                            ),
+                          ),
+                        );
                       },
                       child: Card(
                         margin: const EdgeInsets.only(bottom: 16),
@@ -256,15 +204,15 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
                           padding: const EdgeInsets.all(12.0),
                           child: Row(
                             children: [
-                              image.startsWith('http')
+                              medicament.image.startsWith('http')
                                   ? Image.network(
-                                image,
+                                medicament.image,
                                 height: 70,
                                 width: 100,
                                 fit: BoxFit.cover,
                               )
                                   : Image.asset(
-                                image,
+                                medicament.image,
                                 height: 70,
                                 width: 100,
                                 fit: BoxFit.cover,
@@ -275,7 +223,7 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      nom,
+                                      medicament.nom,
                                       style: const TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
@@ -283,7 +231,7 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
-                                      prixNouveau,
+                                      medicament.prixNouveau,
                                       style: TextStyle(
                                         fontSize: 16,
                                         fontWeight: FontWeight.bold,
@@ -294,120 +242,42 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
                                 ),
                               ),
                               const SizedBox(width: 8),
-                              if (_isAdmin)
-                                Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    // Bouton d'édition
-                                    IconButton(
-                                      icon: const Icon(Icons.edit, color: Colors.blue),
-                                      onPressed: () {
-                                        // Naviguer vers le formulaire d'édition
-                                        if (item is Medicament) {
-                                          Navigator.pushNamed(
-                                            context,
-                                            '/admin/editer_medicament',
-                                            arguments: item,
-                                          );
-                                        } else {
-                                          // Convertir en objet Medicament
-                                          final medicament = Medicament(
-                                            id: id,
-                                            nom: nom,
-                                            image: image,
-                                            prixAncien: prixAncien,
-                                            prixNouveau: prixNouveau,
-                                            categorie: item['categorie'] ?? 'Adulte',
-                                            quantite: 0,
-                                            description: 'Description non disponible',
-                                          );
-                                          Navigator.pushNamed(
-                                            context,
-                                            '/admin/editer_medicament',
-                                            arguments: medicament,
-                                          );
-                                        }
-                                      },
-                                    ),
-                                    // Bouton de suppression
-                                    IconButton(
-                                      icon: const Icon(Icons.delete, color: Colors.red),
-                                      onPressed: () {
-                                        // Afficher une boîte de dialogue de confirmation
-                                        showDialog(
-                                          context: context,
-                                          builder: (context) => AlertDialog(
-                                            title: const Text('Confirmation'),
-                                            content: Text('Voulez-vous vraiment supprimer $nom?'),
-                                            actions: [
-                                              TextButton(
-                                                onPressed: () => Navigator.pop(context),
-                                                child: const Text('Annuler'),
-                                              ),
-                                              TextButton(
-                                                onPressed: () {
-                                                  Navigator.pop(context);
-                                                  if (id != null && _medicaments.isNotEmpty) {
-                                                    _supprimerMedicament(id);
-                                                  } else {
-                                                    // Simuler une suppression avec les données locales
-                                                    setState(() {
-                                                      ListeMedicaments.medicaments.removeAt(index);
-                                                    });
-                                                    ScaffoldMessenger.of(context).showSnackBar(
-                                                      SnackBar(content: Text('$nom supprimé!')),
-                                                    );
-                                                  }
-                                                },
-                                                child: const Text('Supprimer'),
-                                                style: TextButton.styleFrom(
-                                                  foregroundColor: Colors.red,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                  ],
-                                )
-                              else
-                              // Bouton d'ajout au panier pour les utilisateurs normaux
-                                SizedBox(
-                                  height: 35,
-                                  width: 35,
-                                  child: ElevatedButton(
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: Colors.green.shade900,
-                                      padding: EdgeInsets.zero,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(5),
-                                      ),
-                                    ),
-                                    onPressed: () {
-                                      final panierProvider = Provider.of<PanierProvider>(context, listen: false);
-                                      // Créer un Map pour l'ajouter au panier
-                                      final produit = {
-                                        'nom': nom,
-                                        'image': image,
-                                        'prixAncien': prixAncien,
-                                        'prixNouveau': prixNouveau,
-                                        'quantite': 1,
-                                      };
-                                      panierProvider.ajouterAuPanier(produit);
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        SnackBar(
-                                          content: Text('$nom ajouté au panier!'),
-                                        ),
-                                      );
-                                    },
-                                    child: const Icon(
-                                      Icons.shopping_cart,
-                                      color: Colors.white,
-                                      size: 20,
+                              // Bouton d'ajout au panier
+                              SizedBox(
+                                height: 35,
+                                width: 35,
+                                child: ElevatedButton(
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green.shade900,
+                                    padding: EdgeInsets.zero,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(5),
                                     ),
                                   ),
+                                  onPressed: () {
+                                    final panierProvider = Provider.of<PanierProvider>(context, listen: false);
+                                    // Créer un Map pour l'ajouter au panier
+                                    final produit = {
+                                      'nom': medicament.nom,
+                                      'image': medicament.image,
+                                      'prixAncien': medicament.prixAncien,
+                                      'prixNouveau': medicament.prixNouveau,
+                                      'quantite': 1,
+                                    };
+                                    panierProvider.ajouterAuPanier(produit);
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text('${medicament.nom} ajouté au panier!'),
+                                      ),
+                                    );
+                                  },
+                                  child: const Icon(
+                                    Icons.shopping_cart,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
                                 ),
+                              ),
                             ],
                           ),
                         ),
@@ -426,36 +296,21 @@ class _ListeProduitsPageState extends State<ListeProduitsPage> {
         selectedItemColor: Colors.greenAccent,
         unselectedItemColor: Colors.white,
         type: BottomNavigationBarType.fixed,
-        items: [
-          const BottomNavigationBarItem(
+        items: const [
+          BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'Accueil',
           ),
-          const BottomNavigationBarItem(
+          BottomNavigationBarItem(
             icon: Icon(Icons.medication_outlined),
             label: 'Liste',
           ),
-          _isAdmin
-              ? const BottomNavigationBarItem(
-            icon: Icon(Icons.admin_panel_settings),
-            label: 'Gestion',
-          )
-              : const BottomNavigationBarItem(
+          BottomNavigationBarItem(
             icon: Icon(Icons.shopping_cart),
             label: 'Panier',
           ),
         ],
       ),
-      // Bouton flottant pour ajouter un médicament (admin uniquement)
-      floatingActionButton: _isAdmin
-          ? FloatingActionButton(
-        backgroundColor: Colors.green.shade900,
-        child: const Icon(Icons.add, color: Colors.white),
-        onPressed: () {
-          Navigator.pushNamed(context, '/admin/ajouter_medicament');
-        },
-      )
-          : null,
     );
   }
 }

@@ -17,6 +17,12 @@ class _ConnexionPageState extends State<ConnexionPage> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
+  @override
+  void initState() {
+    super.initState();
+    _service.clearAuth();
+  }
+
   void _login() async {
     final username = _usernameController.text.trim();
     final password = _passwordController.text.trim();

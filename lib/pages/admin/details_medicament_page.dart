@@ -1,26 +1,67 @@
 // lib/pages/admin/details_medicament_page.dart
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import '../../models/medicament_model.dart';
-import '../panier_provider.dart';
+import '../../services/medicament_service.dart';
 
-class DetailsMedicamentPage extends StatelessWidget {
+class DetailsMedicamentPage extends StatefulWidget {
   final Medicament medicament;
   final bool isAdmin;
 
   const DetailsMedicamentPage({
     Key? key,
     required this.medicament,
-    this.isAdmin = false,
+    this.isAdmin = true,
   }) : super(key: key);
+
+  @override
+  _DetailsMedicamentPageState createState() => _DetailsMedicamentPageState();
+}
+
+class _DetailsMedicamentPageState extends State<DetailsMedicamentPage> {
+  int _selectedIndex = 2; // Par défaut, on est dans l'onglet "Gestion"
+  final MedicamentService _service = MedicamentService();
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    switch (index) {
+      case 0:
+        Navigator.pushReplacementNamed(context, '/accueil', arguments: {'isAdmin': true});
+        break;
+      case 1:
+        Navigator.pushReplacementNamed(context, '/admin/dashboard');
+        break;
+      case 2:
+        Navigator.pushReplacementNamed(context, '/admin/gestion_medicaments');
+        break;
+    }
+  }
+
+  void _logout() {
+    // Nettoyer l'authentification
+    _service.clearAuth();
+    // Rediriger vers la page de connexion
+    Navigator.pushReplacementNamed(context, '/connexion');
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(medicament.nom),
+        title: Text(widget.medicament.nom),
         backgroundColor: Colors.green.shade900,
         foregroundColor: Colors.white,
+        automaticallyImplyLeading: true, // Garder le bouton retour pour la page détail
+        actions: [
+          // Ajouter un bouton de déconnexion
+          IconButton(
+            onPressed: _logout,
+            icon: const Icon(Icons.logout),
+            tooltip: 'Déconnexion',
+          ),
+        ],
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
@@ -28,15 +69,15 @@ class DetailsMedicamentPage extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: medicament.image.startsWith('http')
+              child: widget.medicament.image.startsWith('http')
                   ? Image.network(
-                medicament.image,
+                widget.medicament.image,
                 height: 200,
                 width: double.infinity,
                 fit: BoxFit.contain,
               )
                   : Image.asset(
-                medicament.image,
+                widget.medicament.image,
                 height: 200,
                 width: double.infinity,
                 fit: BoxFit.contain,
@@ -54,7 +95,7 @@ class DetailsMedicamentPage extends StatelessWidget {
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          medicament.nom,
+                          widget.medicament.nom,
                           style: const TextStyle(
                             fontSize: 24,
                             fontWeight: FontWeight.bold,
@@ -70,7 +111,7 @@ class DetailsMedicamentPage extends StatelessWidget {
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
-                            medicament.categorie,
+                            widget.medicament.categorie,
                             style: TextStyle(
                               color: Colors.green.shade900,
                               fontWeight: FontWeight.bold,
@@ -83,7 +124,7 @@ class DetailsMedicamentPage extends StatelessWidget {
                     Row(
                       children: [
                         Text(
-                          medicament.prixAncien,
+                          widget.medicament.prixAncien,
                           style: const TextStyle(
                             decoration: TextDecoration.lineThrough,
                             color: Colors.red,
@@ -92,7 +133,7 @@ class DetailsMedicamentPage extends StatelessWidget {
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          medicament.prixNouveau,
+                          widget.medicament.prixNouveau,
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.bold,
@@ -109,7 +150,7 @@ class DetailsMedicamentPage extends StatelessWidget {
                         const Icon(Icons.inventory, color: Colors.blue),
                         const SizedBox(width: 10),
                         Text(
-                          'Stock disponible: ${medicament.quantite}',
+                          'Stock disponible: ${widget.medicament.quantite}',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -127,7 +168,7 @@ class DetailsMedicamentPage extends StatelessWidget {
                     ),
                     const SizedBox(height: 5),
                     Text(
-                      medicament.description,
+                      widget.medicament.description,
                       style: const TextStyle(fontSize: 16),
                     ),
                   ],
@@ -137,53 +178,51 @@ class DetailsMedicamentPage extends StatelessWidget {
           ],
         ),
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: isAdmin
-            ? ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.blue,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 50),
-          ),
-          onPressed: () {
-            Navigator.pushNamed(
-              context,
-              '/admin/editer_medicament',
-              arguments: medicament,
-            );
-          },
-          child: const Text('Modifier'),
-        )
-            : ElevatedButton(
-          style: ElevatedButton.styleFrom(
-            backgroundColor: Colors.green.shade900,
-            foregroundColor: Colors.white,
-            minimumSize: const Size(double.infinity, 50),
-          ),
-          onPressed: () {
-            // Logique pour ajouter au panier
-            final panierProvider = Provider.of<PanierProvider>(context, listen: false);
-
-            final produit = {
-              'nom': medicament.nom,
-              'image': medicament.image,
-              'prixAncien': medicament.prixAncien,
-              'prixNouveau': medicament.prixNouveau,
-              'quantite': 1,
-            };
-
-            panierProvider.ajouterAuPanier(produit);
-
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${medicament.nom} ajouté au panier!'),
-                duration: const Duration(seconds: 2),
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Bouton d'édition
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 50),
               ),
-            );
-          },
-          child: const Text('Ajouter au panier'),
-        ),
+              onPressed: () {
+                Navigator.pushNamed(
+                  context,
+                  '/admin/editer_medicament',
+                  arguments: widget.medicament,
+                );
+              },
+              child: const Text('Modifier'),
+            ),
+          ),
+          // Bottom Navigation Bar
+          BottomNavigationBar(
+            backgroundColor: Colors.green.shade900,
+            currentIndex: _selectedIndex,
+            onTap: _onItemTapped,
+            selectedItemColor: Colors.greenAccent,
+            unselectedItemColor: Colors.white,
+            items: const [
+              BottomNavigationBarItem(
+                icon: Icon(Icons.home),
+                label: 'Accueil',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.analytics),
+                label: 'Tableau de bord',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.admin_panel_settings),
+                label: 'Gestion',
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

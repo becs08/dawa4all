@@ -2,8 +2,8 @@ import 'package:dawa4all/pages/panier_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:dawa4all/pages/produit_page.dart';
 import 'package:provider/provider.dart';
-
-import '../data/populaire_data.dart';
+import '../models/medicament_model.dart';
+import '../services/medicament_service.dart';
 
 class AccueilPage extends StatefulWidget {
   const AccueilPage({super.key});
@@ -17,6 +17,34 @@ class _AccueilPageState extends State<AccueilPage> {
   String _selectedCategory = 'Tout';
   String _searchQuery = '';
   bool _isAdmin = false;
+  bool _isLoading = true;
+  List<Medicament> _medicaments = [];
+  final MedicamentService _service = MedicamentService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMedicaments();
+  }
+
+  Future<void> _loadMedicaments() async {
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      final medicaments = await _service.getMedicaments();
+      setState(() {
+        _medicaments = medicaments;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+      });
+      // Ne pas afficher de message d'erreur ici, car on est dans l'initialisation
+    }
+  }
 
   @override
   void didChangeDependencies() {
@@ -26,18 +54,18 @@ class _AccueilPageState extends State<AccueilPage> {
     _isAdmin = args?['isAdmin'] ?? false;
   }
 
-  List<Map<String, String>> get _filteredProduits {
-    List<Map<String, String>> filteredList = PopulairePage.produitsPopulaires;
+  List<Medicament> get _filteredMedicaments {
+    List<Medicament> filteredList = _medicaments;
 
     if (_selectedCategory != 'Tout') {
       filteredList = filteredList
-          .where((produit) => produit['categorie'] == _selectedCategory)
+          .where((medicament) => medicament.categorie == _selectedCategory)
           .toList();
     }
 
     if (_searchQuery.isNotEmpty) {
       filteredList = filteredList
-          .where((produit) => produit['nom']!.toLowerCase().contains(_searchQuery.toLowerCase()))
+          .where((medicament) => medicament.nom.toLowerCase().contains(_searchQuery.toLowerCase()))
           .toList();
     }
 
@@ -51,16 +79,31 @@ class _AccueilPageState extends State<AccueilPage> {
 
     switch (index) {
       case 1:
-        Navigator.pushNamed(context, '/listeProduits', arguments: {'isAdmin': _isAdmin});
+        if (_isAdmin) {
+          // Pour l'admin, le deuxième onglet est "Tableau de bord"
+          Navigator.pushNamed(context, '/admin/dashboard');
+        } else {
+          // Pour l'utilisateur, le deuxième onglet est "Liste des produits"
+          Navigator.pushNamed(context, '/listeProduits', arguments: {'isAdmin': _isAdmin});
+        }
         break;
       case 2:
         if (_isAdmin) {
+          // Pour l'admin, le troisième onglet est "Gestion"
           Navigator.pushNamed(context, '/admin/gestion_medicaments');
         } else {
+          // Pour l'utilisateur, le troisième onglet est "Panier"
           Navigator.pushNamed(context, '/panier');
         }
         break;
     }
+  }
+
+  void _logout() {
+    // Nettoyer l'authentification
+    _service.clearAuth();
+    // Rediriger vers la page de connexion
+    Navigator.pushReplacementNamed(context, '/connexion');
   }
 
   @override
@@ -75,17 +118,21 @@ class _AccueilPageState extends State<AccueilPage> {
             Image.asset('assets/logoAccueil.png', height: 37),
             Row(
               children: [
-                /*IconButton(
-                  onPressed: () {},
-                  icon: const Icon(Icons.favorite),
-                  color: Colors.green.shade900,
-                ),*/
+                // Afficher le bouton panier uniquement pour les utilisateurs non-admin
+                if (!_isAdmin)
+                  IconButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/panier');
+                    },
+                    icon: const Icon(Icons.shopping_cart),
+                    color: Colors.green.shade900,
+                  ),
+                // Ajouter un bouton de déconnexion
                 IconButton(
-                  onPressed: () {
-                    Navigator.pushNamed(context, '/panier');
-                  },
-                  icon: const Icon(Icons.shopping_cart),
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout),
                   color: Colors.green.shade900,
+                  tooltip: 'Déconnexion',
                 ),
               ],
             ),
@@ -93,7 +140,9 @@ class _AccueilPageState extends State<AccueilPage> {
         ),
       ),
       backgroundColor: Colors.white,
-      body: SingleChildScrollView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(10.0),
           child: Column(
@@ -150,19 +199,27 @@ class _AccueilPageState extends State<AccueilPage> {
                       fontWeight: FontWeight.bold,
                     ),
                   ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.pushNamed(context, '/listeProduits');
-                    },
-                    child: const Text(
-                      '+Voir tout',
-                      style: TextStyle(color: Color(0xFF1B5E20)),
+                  if (!_isAdmin) // Ne pas afficher "Voir tout" pour l'admin
+                    TextButton(
+                      onPressed: () {
+                        Navigator.pushNamed(context, '/listeProduits', arguments: {'isAdmin': _isAdmin});
+                      },
+                      child: const Text(
+                        '+Voir tout',
+                        style: TextStyle(color: Color(0xFF1B5E20)),
+                      ),
                     ),
-                  ),
                 ],
               ),
               const SizedBox(height: 20),
-              GridView.builder(
+              _filteredMedicaments.isEmpty
+                  ? const Center(
+                child: Text(
+                  'Aucun médicament disponible',
+                  style: TextStyle(fontSize: 16, color: Colors.grey),
+                ),
+              )
+                  : GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -171,10 +228,10 @@ class _AccueilPageState extends State<AccueilPage> {
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
                 ),
-                itemCount: _filteredProduits.length,
+                itemCount: _filteredMedicaments.length,
                 itemBuilder: (context, index) {
-                  final produit = _filteredProduits[index];
-                  return _buildProductCard(produit);
+                  final medicament = _filteredMedicaments[index];
+                  return _buildProductCard(medicament);
                 },
               ),
             ],
@@ -192,10 +249,17 @@ class _AccueilPageState extends State<AccueilPage> {
             icon: Icon(Icons.home),
             label: 'Accueil',
           ),
-          const BottomNavigationBarItem(
+          // Modifier le deuxième élément en fonction du rôle
+          _isAdmin
+              ? const BottomNavigationBarItem(
+            icon: Icon(Icons.analytics),
+            label: 'Tableau de bord',
+          )
+              : const BottomNavigationBarItem(
             icon: Icon(Icons.medication_outlined),
             label: 'Liste',
           ),
+          // Modifier le troisième élément en fonction du rôle
           _isAdmin
               ? const BottomNavigationBarItem(
             icon: Icon(Icons.admin_panel_settings),
@@ -242,24 +306,34 @@ class _AccueilPageState extends State<AccueilPage> {
     );
   }
 
-  Widget _buildProductCard(Map<String, String> produit) {
+  Widget _buildProductCard(Medicament medicament) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) => ProduitPage(
-              nomProduit: produit['nom']!,
-              imageProduit: produit['image']!,
-              prixAncien: produit['prixAncien']!,
-              prixNouveau: produit['prixNouveau']!,
+        if (_isAdmin) {
+          // Pour l'admin, naviguer vers la page de détails admin
+          Navigator.pushNamed(
+            context,
+            '/admin/details_medicament',
+            arguments: medicament,
+          );
+        } else {
+          // Pour l'utilisateur normal
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ProduitPage(
+                nomProduit: medicament.nom,
+                imageProduit: medicament.image,
+                prixAncien: medicament.prixAncien,
+                prixNouveau: medicament.prixNouveau,
+                id: medicament.id,
+              ),
+              settings: RouteSettings(
+                arguments: {'isAdmin': _isAdmin},
+              ),
             ),
-            // Passer le statut admin
-            settings: RouteSettings(
-              arguments: {'isAdmin': _isAdmin},
-            ),
-          ),
-        );
+          );
+        }
       },
       child: Container(
         decoration: BoxDecoration(
@@ -283,8 +357,15 @@ class _AccueilPageState extends State<AccueilPage> {
                 topLeft: Radius.circular(15),
                 topRight: Radius.circular(15),
               ),
-              child: Image.asset(
-                produit['image']!,
+              child: medicament.image.startsWith('http')
+                  ? Image.network(
+                medicament.image,
+                fit: BoxFit.cover,
+                height: 120,
+                width: double.infinity,
+              )
+                  : Image.asset(
+                medicament.image,
                 fit: BoxFit.cover,
                 height: 120,
                 width: double.infinity,
@@ -302,14 +383,16 @@ class _AccueilPageState extends State<AccueilPage> {
                     margin: const EdgeInsets.symmetric(vertical: 4),
                   ),
                   Text(
-                    produit['nom']!,
+                    medicament.nom,
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                   Text.rich(
                     TextSpan(
                       children: [
                         TextSpan(
-                          text: '${produit['prixAncien']!} ',
+                          text: '${medicament.prixAncien} ',
                           style: const TextStyle(
                             decoration: TextDecoration.lineThrough,
                             color: Colors.red,
@@ -317,7 +400,7 @@ class _AccueilPageState extends State<AccueilPage> {
                           ),
                         ),
                         TextSpan(
-                          text: produit['prixNouveau']!,
+                          text: medicament.prixNouveau,
                           style: const TextStyle(
                             color: Color(0xFF1B5E20),
                             fontSize: 14,
@@ -335,24 +418,44 @@ class _AccueilPageState extends State<AccueilPage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    onPressed: () {
-                      final panierProvider = Provider.of<PanierProvider>(context, listen: false);
-                      panierProvider.ajouterAuPanier(produit);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(
-                          content: Text('${produit['nom']} ajouté au panier!'),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.shopping_cart),
-                    color: Colors.green.shade900,
-                  ),
+                  // Afficher le bouton panier uniquement pour les utilisateurs non-admin
+                  if (!_isAdmin)
+                    IconButton(
+                      onPressed: () {
+                        final panierProvider = Provider.of<PanierProvider>(context, listen: false);
+                        final produit = {
+                          'nom': medicament.nom,
+                          'image': medicament.image,
+                          'prixAncien': medicament.prixAncien,
+                          'prixNouveau': medicament.prixNouveau,
+                          'quantite': 1,
+                        };
+                        panierProvider.ajouterAuPanier(produit);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('${medicament.nom} ajouté au panier!'),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.shopping_cart),
+                      color: Colors.green.shade900,
+                    ),
+                  if (_isAdmin)
+                    IconButton(
+                      onPressed: () {
+                        Navigator.pushNamed(
+                          context,
+                          '/admin/editer_medicament',
+                          arguments: medicament,
+                        );
+                      },
+                      icon: const Icon(Icons.edit),
+                      color: Colors.blue,
+                    ),
                 ],
               ),
             ),
           ],
-
         ),
       ),
     );

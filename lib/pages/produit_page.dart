@@ -167,8 +167,41 @@ class _ProduitPageState extends State<ProduitPage> {
     }
   }
 
+  void _logout() {
+    // Nettoyer l'authentification
+    _service.clearAuth();
+    // Rediriger vers la page de connexion
+    Navigator.pushReplacementNamed(context, '/connexion');
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Si c'est un admin, rediriger vers la page de détails admin si on a un ID
+    if (_isAdmin && widget.id != null) {
+      // Créer l'objet Medicament
+      final medicament = Medicament(
+        id: widget.id,
+        nom: widget.nomProduit,
+        image: widget.imageProduit,
+        prixAncien: widget.prixAncien,
+        prixNouveau: widget.prixNouveau,
+        categorie: _categorie,
+        quantite: _stockQuantite,
+        description: _description ?? 'Description non disponible',
+      );
+
+      // Naviguer vers le détail admin
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Navigator.pushReplacementNamed(
+          context,
+          '/admin/details_medicament',
+          arguments: medicament,
+        );
+      });
+
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -179,6 +212,25 @@ class _ProduitPageState extends State<ProduitPage> {
             Image.asset(
               'assets/logoAccueil.png',
               height: 37,
+            ),
+            Row(
+              children: [
+                if (!_isAdmin) // Afficher le panier uniquement pour les utilisateurs non-admin
+                  IconButton(
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/panier');
+                    },
+                    icon: const Icon(Icons.shopping_cart),
+                    color: Colors.green.shade900,
+                  ),
+                // Ajouter un bouton de déconnexion
+                IconButton(
+                  onPressed: _logout,
+                  icon: const Icon(Icons.logout),
+                  color: Colors.green.shade900,
+                  tooltip: 'Déconnexion',
+                ),
+              ],
             ),
           ],
         ),
@@ -326,26 +378,26 @@ class _ProduitPageState extends State<ProduitPage> {
                   ],
                 ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: _isAdmin ? Colors.blue : Colors.green.shade900,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      onPressed: _isAdmin ? modifierProduit : ajouterAuPanier,
-                      child: Text(
-                        _isAdmin ? 'Modifier le produit' : 'Ajouter au panier',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.white,
+              if (!_isAdmin) // Ne pas afficher les boutons d'action pour les admins
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.green.shade900,
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                        onPressed: ajouterAuPanier,
+                        child: const Text(
+                          'Ajouter au panier',
+                          style: TextStyle(
+                            fontSize: 16,
+                            color: Colors.white,
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  if (!_isAdmin) // Afficher le bouton panier uniquement pour les utilisateurs normaux
+                    const SizedBox(width: 8),
                     IconButton(
                       onPressed: () {
                         Navigator.pushNamed(context, '/panier');
@@ -355,41 +407,8 @@ class _ProduitPageState extends State<ProduitPage> {
                       iconSize: 28,
                       tooltip: 'Voir le panier',
                     ),
-                  if (_isAdmin) // Afficher le bouton de suppression pour les admins
-                    IconButton(
-                      onPressed: () {
-                        // Afficher une boîte de dialogue de confirmation
-                        showDialog(
-                          context: context,
-                          builder: (context) => AlertDialog(
-                            title: const Text('Confirmation'),
-                            content: Text('Voulez-vous vraiment supprimer ${widget.nomProduit}?'),
-                            actions: [
-                              TextButton(
-                                onPressed: () => Navigator.pop(context),
-                                child: const Text('Annuler'),
-                              ),
-                              TextButton(
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  supprimerProduit();
-                                },
-                                child: const Text('Supprimer'),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.red,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                      icon: const Icon(Icons.delete),
-                      color: Colors.red,
-                      iconSize: 28,
-                      tooltip: 'Supprimer le produit',
-                    ),
-                ],
-              ),
+                  ],
+                ),
               const SizedBox(height: 16),
               Row(
                 children: [
