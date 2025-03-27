@@ -8,10 +8,10 @@ class DetailsMedicamentPage extends StatefulWidget {
   final bool isAdmin;
 
   const DetailsMedicamentPage({
-    Key? key,
+    super.key,
     required this.medicament,
     this.isAdmin = true,
-  }) : super(key: key);
+  });
 
   @override
   _DetailsMedicamentPageState createState() => _DetailsMedicamentPageState();

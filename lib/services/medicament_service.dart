@@ -7,7 +7,7 @@ import '../models/medicament_model.dart';
 class MedicamentService {
   // Remplacez cette URL par l'adresse IP de votre machine si vous testez sur un appareil réel
   // Si vous utilisez l'émulateur Android, utilisez 10.0.2.2 au lieu de localhost
-  final String baseUrl = 'http://10.0.2.2:5000';  // Pour l'émulateur Android
+  final String baseUrl = 'http://172.20.10.2:5000';  // Pour l'émulateur Android
   // final String baseUrl = 'http://localhost:5000';  // Pour le web ou le simulateur iOS
   String? _authHeader;
 

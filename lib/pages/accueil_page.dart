@@ -361,13 +361,13 @@ class _AccueilPageState extends State<AccueilPage> {
                   ? Image.network(
                 medicament.image,
                 fit: BoxFit.cover,
-                height: 120,
+                height: 100,
                 width: double.infinity,
               )
                   : Image.asset(
                 medicament.image,
                 fit: BoxFit.cover,
-                height: 120,
+                height: 100,
                 width: double.infinity,
               ),
             ),
