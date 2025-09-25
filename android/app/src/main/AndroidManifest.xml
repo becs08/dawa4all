@@ -1,4 +1,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Permissions de géolocalisation -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Permission pour l'accès Internet -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <application
         android:label="dawa4all"
         android:name="${applicationName}"

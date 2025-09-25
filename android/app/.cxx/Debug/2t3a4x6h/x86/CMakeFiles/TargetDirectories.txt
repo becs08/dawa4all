@@ -1,0 +1,2 @@
+C:/Users/hp/OneDrive/Bureau/PROJECT/dawa4all/android/app/.cxx/Debug/2t3a4x6h/x86/CMakeFiles/edit_cache.dir
+C:/Users/hp/OneDrive/Bureau/PROJECT/dawa4all/android/app/.cxx/Debug/2t3a4x6h/x86/CMakeFiles/rebuild_cache.dir

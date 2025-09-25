@@ -1,0 +1,175 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+// Modèle pour les commandes
+class CommandeModel {
+  final String id;
+  final String clientId;
+  final String clientNom;
+  final String clientTelephone;
+  final String clientAdresse;
+  final GeoPoint clientLocalisation;
+  final String pharmacieId;
+  final String pharmacieNom;
+  final GeoPoint pharmacieLocalisation;
+  final List<ItemCommande> items;
+  final double montantTotal;
+  final double fraisLivraison;
+  final String statutCommande; // 'en_attente', 'validee', 'refusee', 'en_livraison', 'livree'
+  final String? livreurId;
+  final String? livreurNom;
+  final DateTime dateCommande;
+  final DateTime? dateValidation;
+  final DateTime? dateLivraison;
+  final String modePaiement; // 'wave', 'om', 'cash'
+  final bool paiementEffectue;
+  final String? ordonnanceUrl; // URL de l'ordonnance uploadée
+  final String? noteValidation; // Note de la pharmacie (posologie, etc.)
+  final String? raisonRefus;
+  final double? notePharmacie;
+  final double? noteLivreur;
+  final String? commentaireClient;
+
+  CommandeModel({
+    required this.id,
+    required this.clientId,
+    required this.clientNom,
+    required this.clientTelephone,
+    required this.clientAdresse,
+    required this.clientLocalisation,
+    required this.pharmacieId,
+    required this.pharmacieNom,
+    required this.pharmacieLocalisation,
+    required this.items,
+    required this.montantTotal,
+    required this.fraisLivraison,
+    required this.statutCommande,
+    this.livreurId,
+    this.livreurNom,
+    required this.dateCommande,
+    this.dateValidation,
+    this.dateLivraison,
+    required this.modePaiement,
+    required this.paiementEffectue,
+    this.ordonnanceUrl,
+    this.noteValidation,
+    this.raisonRefus,
+    this.notePharmacie,
+    this.noteLivreur,
+    this.commentaireClient,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'clientId': clientId,
+      'clientNom': clientNom,
+      'clientTelephone': clientTelephone,
+      'clientAdresse': clientAdresse,
+      'clientLocalisation': clientLocalisation,
+      'pharmacieId': pharmacieId,
+      'pharmacieNom': pharmacieNom,
+      'pharmacieLocalisation': pharmacieLocalisation,
+      'items': items.map((item) => item.toMap()).toList(),
+      'montantTotal': montantTotal,
+      'fraisLivraison': fraisLivraison,
+      'statutCommande': statutCommande,
+      'livreurId': livreurId,
+      'livreurNom': livreurNom,
+      'dateCommande': Timestamp.fromDate(dateCommande),
+      'dateValidation': dateValidation != null ? Timestamp.fromDate(dateValidation!) : null,
+      'dateLivraison': dateLivraison != null ? Timestamp.fromDate(dateLivraison!) : null,
+      'modePaiement': modePaiement,
+      'paiementEffectue': paiementEffectue,
+      'ordonnanceUrl': ordonnanceUrl,
+      'noteValidation': noteValidation,
+      'raisonRefus': raisonRefus,
+      'notePharmacie': notePharmacie,
+      'noteLivreur': noteLivreur,
+      'commentaireClient': commentaireClient,
+    };
+  }
+
+  factory CommandeModel.fromMap(Map<String, dynamic> map) {
+    return CommandeModel(
+      id: map['id'] ?? '',
+      clientId: map['clientId'] ?? '',
+      clientNom: map['clientNom'] ?? '',
+      clientTelephone: map['clientTelephone'] ?? '',
+      clientAdresse: map['clientAdresse'] ?? '',
+      clientLocalisation: map['clientLocalisation'],
+      pharmacieId: map['pharmacieId'] ?? '',
+      pharmacieNom: map['pharmacieNom'] ?? '',
+      pharmacieLocalisation: map['pharmacieLocalisation'],
+      items: List<ItemCommande>.from(
+        (map['items'] ?? []).map((item) => ItemCommande.fromMap(item)),
+      ),
+      montantTotal: (map['montantTotal'] ?? 0).toDouble(),
+      fraisLivraison: (map['fraisLivraison'] ?? 0).toDouble(),
+      statutCommande: map['statutCommande'] ?? 'en_attente',
+      livreurId: map['livreurId'],
+      livreurNom: map['livreurNom'],
+      dateCommande: (map['dateCommande'] as Timestamp).toDate(),
+      dateValidation: map['dateValidation'] != null 
+          ? (map['dateValidation'] as Timestamp).toDate() 
+          : null,
+      dateLivraison: map['dateLivraison'] != null 
+          ? (map['dateLivraison'] as Timestamp).toDate() 
+          : null,
+      modePaiement: map['modePaiement'] ?? 'cash',
+      paiementEffectue: map['paiementEffectue'] ?? false,
+      ordonnanceUrl: map['ordonnanceUrl'],
+      noteValidation: map['noteValidation'],
+      raisonRefus: map['raisonRefus'],
+      notePharmacie: map['notePharmacie'] != null 
+          ? (map['notePharmacie']).toDouble() 
+          : null,
+      noteLivreur: map['noteLivreur'] != null 
+          ? (map['noteLivreur']).toDouble() 
+          : null,
+      commentaireClient: map['commentaireClient'],
+    );
+  }
+
+  // Calculer le montant total (médicaments + livraison)
+  double get montantTotalAvecLivraison => montantTotal + fraisLivraison;
+}
+
+// Modèle pour les items d'une commande
+class ItemCommande {
+  final String medicamentId;
+  final String medicamentNom;
+  final double prix;
+  final int quantite;
+  final bool necessite0rdonnance;
+
+  ItemCommande({
+    required this.medicamentId,
+    required this.medicamentNom,
+    required this.prix,
+    required this.quantite,
+    required this.necessite0rdonnance,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'medicamentId': medicamentId,
+      'medicamentNom': medicamentNom,
+      'prix': prix,
+      'quantite': quantite,
+      'necessite0rdonnance': necessite0rdonnance,
+    };
+  }
+
+  factory ItemCommande.fromMap(Map<String, dynamic> map) {
+    return ItemCommande(
+      medicamentId: map['medicamentId'] ?? '',
+      medicamentNom: map['medicamentNom'] ?? '',
+      prix: (map['prix'] ?? 0).toDouble(),
+      quantite: map['quantite'] ?? 1,
+      necessite0rdonnance: map['necessite0rdonnance'] ?? false,
+    );
+  }
+
+  // Calculer le sous-total de l'item
+  double get sousTotal => prix * quantite;
+}

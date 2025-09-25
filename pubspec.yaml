@@ -32,8 +32,13 @@ dependencies:
   firebase_core: ^2.24.2  # Dernière version stable
   firebase_auth: ^4.16.0  # Version compatible
   cloud_firestore: ^4.14.0  # Version compatible
-  firebase_storage: ^11.6.0  # Version compatible
+  firebase_storage: ^11.2.6  # Version stable sans bugs metadata
   http: ^0.13.5
+  geolocator: ^10.1.0  # Pour la géolocalisation
+  google_maps_flutter: ^2.5.0  # Pour afficher les cartes
+  image_picker: ^1.0.4  # Pour uploader les ordonnances
+  url_launcher: ^6.2.2  # Pour ouvrir maps et appeler
+  intl: ^0.19.0  # Pour le formatage des dates
   flutter:
     sdk: flutter
 
