@@ -220,11 +220,18 @@ class FirebaseSimpleAuth {
           'numeroLicense': additionalData['numeroLicense'] ?? '',
           'heuresOuverture': additionalData['heuresOuverture'] ?? '08:00',
           'heuresFermeture': additionalData['heuresFermeture'] ?? '20:00',
+          'telephonePharmacie': additionalData['telephone'] ?? '',
+          'horaires24h': additionalData['horaires24h'] ?? false,
+          'estOuverte': additionalData['estOuverte'] ?? true,
+          'horairesDetailles': additionalData['horairesDetailles'] ?? {},
+          'horairesOuverture': additionalData['horairesOuverture'] ?? '',
+          'joursGarde': additionalData['joursGarde'] ?? [],
           'ouvert': true,
-          'note': 0.0,
-          'nombreAvis': 0,
+          'note': additionalData['note'] ?? 0.0,
+          'nombreAvis': additionalData['nombreAvis'] ?? 0,
+          'photoUrl': additionalData['photoUrl'],
         });
-        print('✅ Document pharmacie créé');
+        print('✅ Document pharmacie créé avec tous les champs: ${additionalData['joursGarde']}');
       } else if (typeUtilisateur == 'livreur' && additionalData != null) {
         await _firestore.collection('livreurs').doc(uid).set({
           'userId': uid,

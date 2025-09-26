@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
 
 class RegisterPharmacieScreen extends StatefulWidget {
@@ -31,6 +32,7 @@ class _RegisterPharmacieScreenState extends State<RegisterPharmacieScreen> {
   bool _obscureConfirmPassword = true;
   bool _est24h = false;
   bool _useGpsCoordinates = true; // true pour GPS, false pour Maps URL
+  bool _useManualCoords = false; // Pour forcer la saisie manuelle avec URL courte
   
   // Horaires détaillés par jour
   final Map<String, String> _horairesDetailles = {
@@ -49,11 +51,31 @@ class _RegisterPharmacieScreenState extends State<RegisterPharmacieScreen> {
   // Extraire les coordonnées depuis une URL Google Maps
   void _extractCoordinatesFromUrl(String url) {
     try {
+      // Si c'est un lien court (maps.app.goo.gl), on informe l'utilisateur
+      if (url.contains('maps.app.goo.gl') || url.contains('goo.gl')) {
+        // Stocker l'URL pour l'utiliser plus tard
+        _mapsUrlController.text = url;
+        
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('ℹ️ Lien court détecté. Veuillez saisir manuellement les coordonnées GPS.\nVous pouvez ouvrir le lien dans Google Maps pour les obtenir.'),
+            backgroundColor: Colors.blue,
+            duration: Duration(seconds: 5),
+          ),
+        );
+        
+        // Basculer en mode saisie manuelle
+        setState(() {
+          _useManualCoords = true;
+        });
+        return;
+      }
+      
       // Pattern pour Google Maps: https://maps.google.com/?q=lat,lng
       // ou https://www.google.com/maps/place/.../@lat,lng,zoom...
-      
-      RegExp latLngRegex = RegExp(r'[@,](-?\d+\.?\d*),(-?\d+\.?\d*)');
-      RegExp qRegex = RegExp(r'[?&]q=(-?\d+\.?\d*),(-?\d+\.?\d*)');
+      // Supporte les coordonnées négatives
+      RegExp latLngRegex = RegExp(r'[@/](-?\d+\.?\d*),\s*(-?\d+\.?\d*)');
+      RegExp qRegex = RegExp(r'[?&]q=(-?\d+\.?\d*),\s*(-?\d+\.?\d*)');
       
       Match? match = latLngRegex.firstMatch(url) ?? qRegex.firstMatch(url);
       
@@ -83,6 +105,15 @@ class _RegisterPharmacieScreenState extends State<RegisterPharmacieScreen> {
         ),
       );
     }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Écouter les changements de l'URL pour afficher/cacher le message
+    _mapsUrlController.addListener(() {
+      setState(() {});
+    });
   }
 
   @override
@@ -401,14 +432,77 @@ class _RegisterPharmacieScreenState extends State<RegisterPharmacieScreen> {
                 const SizedBox(height: 16),
 
                 // Position GPS ou URL Maps
-                _useGpsCoordinates ? Row(
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Localisation de la pharmacie',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Icon(
+                                  _useGpsCoordinates ? Icons.gps_fixed : Icons.link,
+                                  size: 16,
+                                  color: Colors.grey[600],
+                                ),
+                                const SizedBox(width: 8),
+                                Text(
+                                  _useGpsCoordinates ? 'Mode GPS' : 'Mode URL Maps',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                                const Spacer(),
+                                TextButton(
+                                  onPressed: () {
+                                    setState(() {
+                                      _useGpsCoordinates = !_useGpsCoordinates;
+                                    });
+                                  },
+                                  child: Text(
+                                    _useGpsCoordinates ? 'Changer vers URL' : 'Changer vers GPS',
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      color: Color(0xFF2E7D32),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          _useGpsCoordinates 
+                            ? 'Entrez directement les coordonnées GPS (supporte les valeurs négatives)'
+                            : 'Collez l\'URL Google Maps de votre pharmacie ou entrez les coordonnées manuellement',
+                          style: TextStyle(
+                            color: Colors.grey[600],
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        _useGpsCoordinates ? Row(
                   children: [
                     Expanded(
                       child: TextFormField(
                         controller: _latitudeController,
-                        keyboardType: TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: TextInputType.numberWithOptions(decimal: true, signed: true),
                         decoration: InputDecoration(
                           labelText: 'Latitude',
+                          hintText: 'Ex: 14.7167 ou -14.7167',
                           prefixIcon: const Icon(Icons.gps_fixed),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -422,8 +516,12 @@ class _RegisterPharmacieScreenState extends State<RegisterPharmacieScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Latitude requise';
                           }
-                          if (double.tryParse(value) == null) {
+                          final lat = double.tryParse(value);
+                          if (lat == null) {
                             return 'Latitude invalide';
+                          }
+                          if (lat < -90 || lat > 90) {
+                            return 'Latitude doit être entre -90 et 90';
                           }
                           return null;
                         },
@@ -433,9 +531,10 @@ class _RegisterPharmacieScreenState extends State<RegisterPharmacieScreen> {
                     Expanded(
                       child: TextFormField(
                         controller: _longitudeController,
-                        keyboardType: TextInputType.numberWithOptions(decimal: true),
+                        keyboardType: TextInputType.numberWithOptions(decimal: true, signed: true),
                         decoration: InputDecoration(
                           labelText: 'Longitude',
+                          hintText: 'Ex: -17.4677 ou 17.4677',
                           prefixIcon: const Icon(Icons.gps_fixed),
                           border: OutlineInputBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -449,8 +548,12 @@ class _RegisterPharmacieScreenState extends State<RegisterPharmacieScreen> {
                           if (value == null || value.isEmpty) {
                             return 'Longitude requise';
                           }
-                          if (double.tryParse(value) == null) {
+                          final lng = double.tryParse(value);
+                          if (lng == null) {
                             return 'Longitude invalide';
+                          }
+                          if (lng < -180 || lng > 180) {
+                            return 'Longitude doit être entre -180 et 180';
                           }
                           return null;
                         },
@@ -463,10 +566,11 @@ class _RegisterPharmacieScreenState extends State<RegisterPharmacieScreen> {
                       controller: _mapsUrlController,
                       decoration: InputDecoration(
                         labelText: 'URL Google Maps',
-                        hintText: 'Collez l\'URL de votre pharmacie depuis Google Maps',
+                        hintText: 'Ex: https://maps.app.goo.gl/...',
                         prefixIcon: const Icon(Icons.link),
                         suffixIcon: IconButton(
                           icon: const Icon(Icons.search),
+                          tooltip: 'Extraire coordonnées',
                           onPressed: () {
                             if (_mapsUrlController.text.isNotEmpty) {
                               _extractCoordinatesFromUrl(_mapsUrlController.text);
@@ -482,15 +586,50 @@ class _RegisterPharmacieScreenState extends State<RegisterPharmacieScreen> {
                         ),
                       ),
                     ),
+                    if (_mapsUrlController.text.contains('maps.app.goo.gl'))
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8, bottom: 8),
+                        child: InkWell(
+                          onTap: () async {
+                            final url = _mapsUrlController.text.trim();
+                            if (await canLaunchUrl(Uri.parse(url))) {
+                              await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: Colors.blue.withOpacity(0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.info_outline, size: 16, color: Colors.blue),
+                                const SizedBox(width: 8),
+                                const Expanded(
+                                  child: Text(
+                                    'Lien court détecté. Tapez ici pour ouvrir dans Maps et récupérer les coordonnées.',
+                                    style: TextStyle(fontSize: 12, color: Colors.blue),
+                                  ),
+                                ),
+                                const Icon(Icons.open_in_new, size: 16, color: Colors.blue),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
                     const SizedBox(height: 12),
                     Row(
                       children: [
                         Expanded(
                           child: TextFormField(
                             controller: _latitudeController,
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: TextInputType.numberWithOptions(decimal: true, signed: true),
                             decoration: InputDecoration(
-                              labelText: 'Latitude (auto-remplie)',
+                              labelText: 'Latitude',
+                              hintText: 'Ex: 14.7167',
                               prefixIcon: const Icon(Icons.gps_fixed),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -500,16 +639,29 @@ class _RegisterPharmacieScreenState extends State<RegisterPharmacieScreen> {
                                 borderSide: const BorderSide(color: Color(0xFF2E7D32)),
                               ),
                             ),
-                            readOnly: true,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Latitude requise';
+                              }
+                              final lat = double.tryParse(value);
+                              if (lat == null) {
+                                return 'Latitude invalide';
+                              }
+                              if (lat < -90 || lat > 90) {
+                                return 'Latitude doit être entre -90 et 90';
+                              }
+                              return null;
+                            },
                           ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: TextFormField(
                             controller: _longitudeController,
-                            keyboardType: TextInputType.numberWithOptions(decimal: true),
+                            keyboardType: TextInputType.numberWithOptions(decimal: true, signed: true),
                             decoration: InputDecoration(
-                              labelText: 'Longitude (auto-remplie)',
+                              labelText: 'Longitude',
+                              hintText: 'Ex: -17.4677',
                               prefixIcon: const Icon(Icons.gps_fixed),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(12),
@@ -519,12 +671,28 @@ class _RegisterPharmacieScreenState extends State<RegisterPharmacieScreen> {
                                 borderSide: const BorderSide(color: Color(0xFF2E7D32)),
                               ),
                             ),
-                            readOnly: true,
+                            validator: (value) {
+                              if (value == null || value.isEmpty) {
+                                return 'Longitude requise';
+                              }
+                              final lng = double.tryParse(value);
+                              if (lng == null) {
+                                return 'Longitude invalide';
+                              }
+                              if (lng < -180 || lng > 180) {
+                                return 'Longitude doit être entre -180 et 180';
+                              }
+                              return null;
+                            },
                           ),
                         ),
                       ],
                     ),
                   ],
+                ),
+                      ],
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
 

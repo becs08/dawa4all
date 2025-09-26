@@ -106,7 +106,7 @@ class LivreurService {
         typeDestinataire: 'client',
         titre: 'Livreur en route',
         message: 'Votre livreur $livreurNom est en route',
-        type: 'livraison',
+        type: NotificationType.commandeLivraison,
         commandeId: commandeId,
         dateCreation: DateTime.now(),
       );
@@ -122,7 +122,7 @@ class LivreurService {
         typeDestinataire: 'pharmacie',
         titre: 'Livraison acceptée',
         message: 'Le livreur $livreurNom a accepté la livraison',
-        type: 'livraison',
+        type: NotificationType.commandeLivraison,
         commandeId: commandeId,
         dateCreation: DateTime.now(),
       );
@@ -170,7 +170,7 @@ class LivreurService {
           typeDestinataire: 'client',
           titre: 'Livraison effectuée',
           message: 'Votre commande a été livrée avec succès',
-          type: 'livraison_confirmee',
+          type: NotificationType.commandeLivree,
           commandeId: commandeId,
           dateCreation: DateTime.now(),
         );

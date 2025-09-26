@@ -111,6 +111,7 @@ class ClientService {
         clientLocalisation: client.localisation ?? GeoPoint(0, 0),
         pharmacieId: pharmacieId,
         pharmacieNom: pharmacie.nomPharmacie,
+        pharmacieAdresse: '${pharmacie.adresse}, ${pharmacie.ville}',
         pharmacieLocalisation: pharmacie.localisation,
         items: items,
         montantTotal: montantTotal,
@@ -119,6 +120,7 @@ class ClientService {
         dateCommande: DateTime.now(),
         modePaiement: modePaiement,
         paiementEffectue: paiementEffectue,
+        typeLivraison: fraisLivraison > 1500 ? 'express' : 'standard',
         ordonnanceUrl: ordonnanceUrl,
       );
 
@@ -134,7 +136,7 @@ class ClientService {
         typeDestinataire: 'pharmacie',
         titre: 'Nouvelle commande',
         message: 'Vous avez reçu une nouvelle commande de ${client.nomComplet}',
-        type: 'commande',
+        type: NotificationType.nouvelleCommande,
         commandeId: commandeId,
         dateCreation: DateTime.now(),
       );
@@ -425,6 +427,34 @@ class ClientService {
       return true;
     } catch (e) {
       print('Erreur lors du marquage de la notification: $e');
+      return false;
+    }
+  }
+
+  // Obtenir les commandes d'un client
+  Stream<List<CommandeModel>> getCommandesClient(String clientId) {
+    return _firestore
+        .collection('commandes')
+        .where('clientId', isEqualTo: clientId)
+        .orderBy('dateCommande', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => CommandeModel.fromMap(doc.data(), doc.id))
+          .toList();
+    });
+  }
+
+  // Annuler une commande
+  Future<bool> annulerCommande(String commandeId) async {
+    try {
+      await _firestore.collection('commandes').doc(commandeId).update({
+        'statutCommande': 'annulee',
+        'dateAnnulation': Timestamp.now(),
+      });
+      return true;
+    } catch (e) {
+      print('Erreur lors de l\'annulation de la commande: $e');
       return false;
     }
   }

@@ -1,5 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import 'package:geolocator/geolocator.dart';
+import 'dart:io';
 import '../../models/pharmacie_model.dart';
 import '../../models/medicament_model.dart';
 import '../../models/commande_model.dart';
@@ -7,11 +10,80 @@ import '../../models/notification_model.dart';
 
 class PharmacieService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth = FirebaseAuth.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
 
   // Instance unique (Singleton)
   static final PharmacieService _instance = PharmacieService._internal();
   factory PharmacieService() => _instance;
   PharmacieService._internal();
+
+  String? get currentPharmacieId => _auth.currentUser?.uid;
+
+  // Obtenir les statistiques du dashboard
+  Future<Map<String, dynamic>> getDashboardStats() async {
+    if (currentPharmacieId == null) {
+      throw Exception('Pharmacie non connectée');
+    }
+
+    try {
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      final endOfDay = DateTime(today.year, today.month, today.day, 23, 59, 59);
+
+      final commandesAujourdhui = await _firestore
+          .collection('commandes')
+          .where('pharmacieId', isEqualTo: currentPharmacieId)
+          .where('dateCommande', isGreaterThanOrEqualTo: startOfDay)
+          .where('dateCommande', isLessThanOrEqualTo: endOfDay)
+          .get();
+
+      final medicaments = await _firestore
+          .collection('medicaments')
+          .where('pharmacieId', isEqualTo: currentPharmacieId)
+          .get();
+
+      final startOfMonth = DateTime(today.year, today.month, 1);
+      final commandesMois = await _firestore
+          .collection('commandes')
+          .where('pharmacieId', isEqualTo: currentPharmacieId)
+          .where('statutCommande', isEqualTo: 'livree')
+          .where('dateCommande', isGreaterThanOrEqualTo: startOfMonth)
+          .get();
+
+      double revenusMois = 0.0;
+      for (var doc in commandesMois.docs) {
+        final data = doc.data() as Map<String, dynamic>;
+        revenusMois += (data['montantTotal'] ?? 0.0).toDouble();
+      }
+
+      final pharmacie = await _firestore
+          .collection('pharmacies')
+          .doc(currentPharmacieId)
+          .get();
+      
+      double noteMoyenne = 0.0;
+      if (pharmacie.exists) {
+        final data = pharmacie.data() as Map<String, dynamic>;
+        noteMoyenne = (data['note'] ?? 0.0).toDouble();
+      }
+
+      return {
+        'commandesAujourdhui': commandesAujourdhui.docs.length,
+        'totalMedicaments': medicaments.docs.length,
+        'revenusMois': revenusMois,
+        'noteMoyenne': noteMoyenne,
+      };
+    } catch (e) {
+      print('Erreur lors de la récupération des stats: $e');
+      return {
+        'commandesAujourdhui': 0,
+        'totalMedicaments': 0,
+        'revenusMois': 0.0,
+        'noteMoyenne': 0.0,
+      };
+    }
+  }
 
   // Obtenir une pharmacie par ID
   Future<PharmacieModel?> getPharmacieById(String id) async {
@@ -25,6 +97,16 @@ class PharmacieService {
       print('Erreur lors de la récupération de la pharmacie: $e');
       return null;
     }
+  }
+
+  // Obtenir une pharmacie par ID (Stream)
+  Stream<PharmacieModel?> getPharmacie(String id) {
+    return _firestore.collection('pharmacies').doc(id).snapshots().map((doc) {
+      if (doc.exists) {
+        return PharmacieModel.fromMap({...doc.data()!, 'id': doc.id});
+      }
+      return null;
+    });
   }
 
   // Obtenir toutes les pharmacies (Stream)
@@ -96,10 +178,18 @@ class PharmacieService {
   // Ajouter un médicament
   Future<bool> ajouterMedicament(String pharmacieId, Medicament medicament) async {
     try {
-      await _firestore.collection('medicaments').add(medicament.toMap());
+      print('🔵 ajouterMedicament appelé avec pharmacieId: $pharmacieId');
+      print('📦 Médicament: ${medicament.nom}');
+      
+      final data = medicament.toMap();
+      print('📝 Données à envoyer: $data');
+      
+      final docRef = await _firestore.collection('medicaments').add(data);
+      print('✅ Médicament ajouté avec ID: ${docRef.id}');
+      
       return true;
     } catch (e) {
-      print('Erreur lors de l\'ajout du médicament: $e');
+      print('❌ Erreur lors de l\'ajout du médicament: $e');
       return false;
     }
   }
@@ -174,7 +264,7 @@ class PharmacieService {
           typeDestinataire: 'client',
           titre: 'Commande validée',
           message: 'Votre commande a été validée par ${commandeData.pharmacieNom}',
-          type: 'validation',
+          type: NotificationType.commandeValidee,
           commandeId: commandeId,
           dateCreation: DateTime.now(),
         );
@@ -224,7 +314,7 @@ class PharmacieService {
         typeDestinataire: 'client',
         titre: 'Commande refusée',
         message: 'Votre commande a été refusée. Raison: $raisonRefus',
-        type: 'refus',
+        type: NotificationType.commandeRefusee,
         commandeId: commandeId,
         dateCreation: DateTime.now(),
       );
@@ -254,7 +344,7 @@ class PharmacieService {
         typeDestinataire: 'livreur',
         titre: 'Nouvelle livraison',
         message: 'Une nouvelle livraison vous a été attribuée',
-        type: 'livraison',
+        type: NotificationType.commandeLivraison,
         commandeId: commandeId,
         dateCreation: DateTime.now(),
       );
@@ -269,12 +359,31 @@ class PharmacieService {
   }
 
   // Mettre à jour le profil de la pharmacie
-  Future<bool> updatePharmacieProfil(String pharmacieId, Map<String, dynamic> updates) async {
+  Future<bool> updatePharmacieProfil(Map<String, dynamic> updates) async {
     try {
-      await _firestore.collection('pharmacies').doc(pharmacieId).update(updates);
+      if (currentPharmacieId == null) {
+        throw Exception('Pharmacie non connectée');
+      }
+      await _firestore.collection('pharmacies').doc(currentPharmacieId).update(updates);
       return true;
     } catch (e) {
       print('Erreur lors de la mise à jour du profil: $e');
+      return false;
+    }
+  }
+
+  // Changer le statut d'ouverture/fermeture
+  Future<bool> changerStatutOuverture(bool ouvert) async {
+    try {
+      if (currentPharmacieId == null) {
+        throw Exception('Pharmacie non connectée');
+      }
+      await _firestore.collection('pharmacies').doc(currentPharmacieId).update({
+        'estOuverte': ouvert,
+      });
+      return true;
+    } catch (e) {
+      print('Erreur lors du changement de statut: $e');
       return false;
     }
   }
@@ -289,6 +398,79 @@ class PharmacieService {
       return true;
     } catch (e) {
       print('Erreur lors de la mise à jour du stock: $e');
+      return false;
+    }
+  }
+
+  // Mettre à jour le statut d'une commande
+  Future<bool> updateCommandeStatut(String commandeId, String nouveauStatut) async {
+    try {
+      await _firestore.collection('commandes').doc(commandeId).update({
+        'statutCommande': nouveauStatut,
+        'dateMiseAJour': FieldValue.serverTimestamp(),
+      });
+      return true;
+    } catch (e) {
+      print('Erreur lors de la mise à jour du statut: $e');
+      return false;
+    }
+  }
+
+  // Corriger les champs manquants dans les pharmacies existantes
+  Future<bool> corrigerChampsManquants() async {
+    try {
+      final snapshot = await _firestore.collection('pharmacies').get();
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        
+        // Vérifier si les champs sont manquants
+        Map<String, dynamic> updates = {};
+        
+        if (!data.containsKey('joursGarde')) {
+          updates['joursGarde'] = [];
+        }
+        
+        if (!data.containsKey('horairesDetailles')) {
+          updates['horairesDetailles'] = {
+            'lundi': '08:00-20:00',
+            'mardi': '08:00-20:00',
+            'mercredi': '08:00-20:00',
+            'jeudi': '08:00-20:00',
+            'vendredi': '08:00-20:00',
+            'samedi': '08:00-20:00',
+            'dimanche': 'Fermé',
+          };
+        }
+        
+        if (!data.containsKey('horaires24h')) {
+          updates['horaires24h'] = false;
+        }
+        
+        if (!data.containsKey('estOuverte')) {
+          updates['estOuverte'] = data['ouvert'] ?? true;
+        }
+        
+        if (!data.containsKey('telephonePharmacie')) {
+          updates['telephonePharmacie'] = '';
+        }
+        
+        if (!data.containsKey('horairesOuverture')) {
+          final ouverture = data['heuresOuverture'] ?? '08:00';
+          final fermeture = data['heuresFermeture'] ?? '20:00';
+          updates['horairesOuverture'] = '$ouverture-$fermeture';
+        }
+        
+        // Appliquer les mises à jour si nécessaire
+        if (updates.isNotEmpty) {
+          await _firestore.collection('pharmacies').doc(doc.id).update(updates);
+          print('✅ Pharmacie ${doc.id} mise à jour: ${updates.keys.join(', ')}');
+        }
+      }
+      
+      return true;
+    } catch (e) {
+      print('❌ Erreur lors de la correction des champs manquants: $e');
       return false;
     }
   }

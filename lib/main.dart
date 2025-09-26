@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+// Services
+import 'services/notification_service.dart';
+import 'services/firebase/notification_firebase_service.dart';
 
 // Providers
 import 'providers/auth_provider.dart';
 import 'providers/panier_provider.dart';
+import 'providers/notification_provider.dart';
 
 // Models
 import 'models/pharmacie_model.dart';
@@ -36,7 +42,7 @@ import 'screens/client/orders_history_screen.dart';
 import 'screens/pharmacie/pharmacie_dashboard_screen.dart';
 import 'screens/pharmacie/medicaments_management_screen.dart';
 import 'screens/pharmacie/orders_management_screen.dart';
-import 'screens/pharmacie/profile_pharmacie_screen.dart';
+import 'screens/pharmacie/profile_screen.dart';
 
 // Écrans Livreur
 import 'screens/livreur/livreur_dashboard_screen.dart';
@@ -51,15 +57,30 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp();
   
+  // Initialiser les services de notifications
+  final notificationService = NotificationService();
+  await notificationService.initialize();
+  
+  // Configurer le gestionnaire des messages FCM en background
+  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => PanierProvider()),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: const MyApp(),
     ),
   );
+}
+
+/// Gestionnaire pour les messages FCM en background
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print('📨 Message FCM reçu en background: ${message.notification?.title}');
 }
 
 class MyApp extends StatelessWidget {
@@ -152,7 +173,7 @@ class MyApp extends StatelessWidget {
         '/pharmacie/dashboard': (context) => const PharmacieDashboardScreen(),
         '/pharmacie/medicaments': (context) => const MedicamentsManagementScreen(),
         '/pharmacie/orders': (context) => const OrdersManagementScreen(),
-        '/pharmacie/profile': (context) => const ProfilePharmacieScreen(),
+        '/pharmacie/profile': (context) => const ProfileScreen(),
         
         // Routes Livreur
         '/livreur/dashboard': (context) => const LivreurDashboardScreen(),

@@ -4,6 +4,7 @@ import '../../providers/panier_provider.dart';
 import 'client_home_screen.dart';
 import 'pharmacies_list_screen.dart';
 import 'cart_screen.dart';
+import 'orders_history_screen.dart';
 import 'client_profile_screen.dart';
 
 class ClientMainScreen extends StatefulWidget {
@@ -20,6 +21,7 @@ class _ClientMainScreenState extends State<ClientMainScreen> {
     const ClientHomeScreen(),
     const PharmaciesListScreen(),
     const CartScreen(),
+    const OrdersHistoryScreen(),
     const ClientProfileScreen(),
   ];
 
@@ -143,6 +145,11 @@ class _ClientMainScreenState extends State<ClientMainScreen> {
                 },
               ),
               label: 'Panier',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.history_outlined),
+              activeIcon: Icon(Icons.history),
+              label: 'Commandes',
             ),
             const BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

@@ -266,6 +266,9 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 case 'test_data':
                   _createTestData();
                   break;
+                case 'fix_data':
+                  _fixMissingFields();
+                  break;
                 case 'logout':
                   _showLogoutDialog();
                   break;
@@ -291,6 +294,13 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
                 child: ListTile(
                   leading: Icon(Icons.science),
                   title: Text('Créer données test'),
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'fix_data',
+                child: ListTile(
+                  leading: Icon(Icons.build),
+                  title: Text('Corriger pharmacies'),
                 ),
               ),
               const PopupMenuItem(
@@ -1093,6 +1103,45 @@ class _ClientHomeScreenState extends State<ClientHomeScreen> {
         );
       },
     );
+  }
+
+  // Méthode pour corriger les champs manquants dans les pharmacies existantes  
+  Future<void> _fixMissingFields() async {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('🔧 Correction des champs manquants en cours...'),
+        backgroundColor: Colors.orange,
+        duration: Duration(seconds: 2),
+      ),
+    );
+
+    try {
+      final success = await _pharmacieService.corrigerChampsManquants();
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Correction des pharmacies terminée !'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        
+        // Recharger les pharmacies
+        await _loadPharmaciesProches();
+        setState(() {});
+      } else {
+        throw Exception('Erreur lors de la correction');
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('❌ Erreur lors de la correction: $e'),
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    }
   }
 
   Future<void> _createTestData() async {
