@@ -26,6 +26,42 @@ class LivreurService {
     }
   }
 
+  // Obtenir tous les livreurs
+  Future<List<LivreurModel>> getAllLivreurs() async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('livreurs')
+          .orderBy('note', descending: true)
+          .get();
+      
+      return querySnapshot.docs
+          .map((doc) => LivreurModel.fromMap(doc.data()))
+          .toList();
+    } catch (e) {
+      print('Erreur lors de la récupération des livreurs: $e');
+      return [];
+    }
+  }
+
+  // Obtenir les livreurs disponibles
+  Future<List<LivreurModel>> getLivreursDisponibles() async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('livreurs')
+          .where('estDisponible', isEqualTo: true)
+          .where('statut', isEqualTo: 'actif')
+          .orderBy('note', descending: true)
+          .get();
+      
+      return querySnapshot.docs
+          .map((doc) => LivreurModel.fromMap(doc.data()))
+          .toList();
+    } catch (e) {
+      print('Erreur lors de la récupération des livreurs disponibles: $e');
+      return [];
+    }
+  }
+
   // Mettre à jour la position du livreur
   Future<bool> updatePosition(String livreurId, Position position) async {
     try {
@@ -54,7 +90,7 @@ class LivreurService {
     }
   }
 
-  // Obtenir les demandes de livraison disponibles
+  // Obtenir les demandes de livraison disponibles (non attribuées)
   Stream<List<CommandeModel>> getDemandesLivraison() {
     return _firestore
         .collection('commandes')
@@ -64,29 +100,75 @@ class LivreurService {
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
-          .map((doc) => CommandeModel.fromMap(doc.data()))
+          .map((doc) => CommandeModel.fromMap(doc.data(), doc.id))
           .toList();
     });
   }
 
+  // Obtenir les commandes attribuées à un livreur spécifique
+  Stream<List<CommandeModel>> getCommandesAttribuees(String livreurId) {
+    return _firestore
+        .collection('commandes')
+        .where('statutCommande', isEqualTo: 'prete')
+        .where('livreurId', isEqualTo: livreurId)
+        .orderBy('datePrete', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => CommandeModel.fromMap(doc.data(), doc.id))
+          .toList();
+    });
+  }
+
+  // Refuser une livraison
+  Future<bool> refuserLivraison(String commandeId) async {
+    try {
+      // Marquer la commande comme refusée par ce livreur
+      await _firestore.collection('commandes').doc(commandeId).update({
+        'dateDerniereRefus': Timestamp.now(),
+      });
+      return true;
+    } catch (e) {
+      print('Erreur lors du refus de la livraison: $e');
+      return false;
+    }
+  }
+
   // Accepter une livraison
-  Future<bool> accepterLivraison(String commandeId, String livreurId, String livreurNom) async {
+  Future<bool> accepterLivraison(String commandeId, String livreurId, [String? livreurNom]) async {
     try {
       // Vérifier si la commande est toujours disponible
       final commandeDoc = await _firestore.collection('commandes').doc(commandeId).get();
       if (!commandeDoc.exists) return false;
       
-      final commande = CommandeModel.fromMap(commandeDoc.data()!);
-      if (commande.livreurId != null) {
-        // La commande a déjà été prise
+      final commande = CommandeModel.fromMap(commandeDoc.data()!, commandeId);
+      // Pour les commandes attribuées, vérifier que c'est bien le bon livreur
+      if (commande.statutCommande == 'prete' && commande.livreurId != livreurId) {
+        // La commande a été attribuée à un autre livreur
         return false;
+      }
+      // Pour les commandes non attribuées, vérifier qu'elles sont disponibles
+      if (commande.statutCommande == 'validee' && commande.livreurId != null) {
+        // La commande a déjà été prise par un autre livreur
+        return false;
+      }
+
+      // Obtenir le nom du livreur si pas fourni
+      String nomLivreur = livreurNom ?? '';
+      if (nomLivreur.isEmpty) {
+        final livreurDoc = await _firestore.collection('livreurs').doc(livreurId).get();
+        if (livreurDoc.exists) {
+          final livreurData = livreurDoc.data()!;
+          nomLivreur = '${livreurData['nom']} ${livreurData['prenom']}';
+        }
       }
 
       // Attribuer le livreur
       await _firestore.collection('commandes').doc(commandeId).update({
         'livreurId': livreurId,
-        'livreurNom': livreurNom,
-        'statutCommande': 'en_livraison',
+        'livreurNom': nomLivreur,
+        'statutCommande': 'en_route_pharmacie',
+        'statut': 'en_route_pharmacie',
         'dateAcceptation': Timestamp.now(),
       });
 
@@ -105,7 +187,7 @@ class LivreurService {
         destinataireId: commande.clientId,
         typeDestinataire: 'client',
         titre: 'Livreur en route',
-        message: 'Votre livreur $livreurNom est en route',
+        message: 'Votre livreur $nomLivreur est en route',
         type: NotificationType.commandeLivraison,
         commandeId: commandeId,
         dateCreation: DateTime.now(),
@@ -121,7 +203,7 @@ class LivreurService {
         destinataireId: commande.pharmacieId,
         typeDestinataire: 'pharmacie',
         titre: 'Livraison acceptée',
-        message: 'Le livreur $livreurNom a accepté la livraison',
+        message: 'Le livreur $nomLivreur a accepté la livraison',
         type: NotificationType.commandeLivraison,
         commandeId: commandeId,
         dateCreation: DateTime.now(),
@@ -139,24 +221,51 @@ class LivreurService {
     }
   }
 
+  // Confirmer récupération à la pharmacie
+  Future<bool> confirmerRecuperationCommande(String commandeId) async {
+    try {
+      await _firestore.collection('commandes').doc(commandeId).update({
+        'statutCommande': 'recuperee',
+        'statut': 'en_route_client',
+        'dateRecuperation': Timestamp.now(),
+      });
+      return true;
+    } catch (e) {
+      print('Erreur lors de la confirmation de récupération: $e');
+      return false;
+    }
+  }
+
   // Confirmer une livraison
-  Future<bool> confirmerLivraison(String commandeId, String livreurId) async {
+  Future<bool> confirmerLivraison(String commandeId, [String? livreurId]) async {
     try {
       await _firestore.collection('commandes').doc(commandeId).update({
         'statutCommande': 'livree',
+        'statut': 'livree',
         'dateLivraison': Timestamp.now(),
       });
 
+      // Obtenir livreurId de la commande si pas fourni
+      String actualLivreurId = livreurId ?? '';
+      if (actualLivreurId.isEmpty) {
+        final commandeDoc = await _firestore.collection('commandes').doc(commandeId).get();
+        if (commandeDoc.exists) {
+          actualLivreurId = commandeDoc.data()!['livreurId'] ?? '';
+        }
+      }
+
       // Mettre à jour les stats du livreur
-      final livreurDoc = await _firestore.collection('livreurs').doc(livreurId).get();
-      if (livreurDoc.exists) {
-        final livreur = LivreurModel.fromMap(livreurDoc.data()!);
-        
-        await _firestore.collection('livreurs').doc(livreurId).update({
-          'nombreLivraisons': livreur.nombreLivraisons + 1,
-          'statut': 'actif',
-          'estDisponible': true,
-        });
+      if (actualLivreurId.isNotEmpty) {
+        final livreurDoc = await _firestore.collection('livreurs').doc(actualLivreurId).get();
+        if (livreurDoc.exists) {
+          final livreur = LivreurModel.fromMap(livreurDoc.data()!);
+          
+          await _firestore.collection('livreurs').doc(actualLivreurId).update({
+            'nombreLivraisons': livreur.nombreLivraisons + 1,
+            'statut': 'actif',
+            'estDisponible': true,
+          });
+        }
       }
 
       // Créer une notification pour le client
@@ -194,7 +303,7 @@ class LivreurService {
         .snapshots()
         .map((snapshot) {
       return snapshot.docs
-          .map((doc) => CommandeModel.fromMap(doc.data()))
+          .map((doc) => CommandeModel.fromMap(doc.data(), doc.id))
           .toList();
     });
   }
@@ -253,7 +362,7 @@ class LivreurService {
   }
 
   // Obtenir les livreurs disponibles près d'une position
-  Future<List<LivreurModel>> getLivreursDisponibles(GeoPoint position, double radiusKm) async {
+  Future<List<LivreurModel>> getLivreursDisponiblesProches(GeoPoint position, double radiusKm) async {
     try {
       final snapshot = await _firestore
           .collection('livreurs')

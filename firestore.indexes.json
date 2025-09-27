@@ -1,0 +1,73 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "commandes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "statutCommande",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "livreurId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "datePrete",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "commandes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "statutCommande",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "livreurId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dateCommande",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "commandes",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "statutCommande",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "livreurId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dateValidation",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
+      "collectionGroup": "notifications",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "destinataireId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "dateCreation",
+          "order": "DESCENDING"
+        }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

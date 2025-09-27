@@ -48,6 +48,7 @@ import 'screens/pharmacie/profile_screen.dart';
 import 'screens/livreur/livreur_dashboard_screen.dart';
 import 'screens/livreur/available_deliveries_screen.dart';
 import 'screens/livreur/active_delivery_screen.dart';
+import 'screens/livreur/simple_active_delivery_screen.dart';
 import 'screens/livreur/delivery_history_screen.dart';
 
 // Écrans de test
@@ -179,6 +180,7 @@ class MyApp extends StatelessWidget {
         '/livreur/dashboard': (context) => const LivreurDashboardScreen(),
         '/livreur/deliveries': (context) => const AvailableDeliveriesScreen(),
         '/livreur/active-delivery': (context) => const ActiveDeliveryScreen(),
+        '/livreur/simple-active-delivery': (context) => const SimpleActiveDeliveryScreen(),
         '/livreur/history': (context) => const DeliveryHistoryScreen(),
         
         // Routes Test

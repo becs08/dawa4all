@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/auth/auth_service.dart';
 import '../services/auth/auth_service_v2.dart';
 import '../services/auth/firebase_simple_auth.dart';
@@ -11,6 +12,7 @@ import '../models/client_model.dart';
 class AuthProvider extends ChangeNotifier {
   final AuthService _authService = AuthService();
   final AuthServiceV2 _authServiceV2 = AuthServiceV2();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   
   UserModel? _currentUser;
   String? _userType;
@@ -262,9 +264,14 @@ class AuthProvider extends ChangeNotifier {
     required String password,
     required String nomComplet,
     required String telephone,
+    required String adresse,
+    required String ville,
+    required String cni,
     required String numeroPermis,
     required String typeVehicule,
     required String numeroVehicule,
+    double? latitude,
+    double? longitude,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -281,36 +288,63 @@ class AuthProvider extends ChangeNotifier {
         throw 'Impossible de créer le compte.';
       }
       
-      // Créer les documents Firestore
-      final success = await FirebaseSimpleAuth.createUserDocuments(
-        uid: uid,
+      // Créer le document utilisateur
+      final userDoc = {
+        'id': uid,
+        'email': email,
+        'nom': nomComplet,
+        'telephone': telephone,
+        'typeUtilisateur': 'livreur',
+        'dateCreation': Timestamp.now(),
+      };
+      
+      await _firestore.collection('users').doc(uid).set(userDoc);
+      
+      // Créer le document livreur avec tous les champs
+      final livreurDoc = {
+        'id': uid,
+        'userId': uid,
+        'nom': nomComplet.split(' ').first,
+        'prenom': nomComplet.split(' ').length > 1 ? nomComplet.split(' ').skip(1).join(' ') : '',
+        'email': email,
+        'telephone': telephone,
+        'adresse': adresse,
+        'ville': ville,
+        'cni': cni,
+        'nomComplet': nomComplet,
+        'numeroPermis': numeroPermis,
+        'typeVehicule': typeVehicule,
+        'numeroVehicule': numeroVehicule,
+        'plaqueVehicule': numeroVehicule,
+        'estDisponible': false,
+        'positionActuelle': latitude != null && longitude != null 
+            ? GeoPoint(latitude, longitude) 
+            : null,
+        'note': 0.0,
+        'nombreAvis': 0,
+        'nombreLivraisons': 0,
+        'statut': 'en_attente_validation',
+        'dateInscription': Timestamp.now(),
+        'derniereActivite': Timestamp.now(),
+      };
+      
+      await _firestore.collection('livreurs').doc(uid).set(livreurDoc);
+      
+      // Créer l'objet UserModel
+      final user = UserModel(
+        id: uid,
         email: email,
         nom: nomComplet,
         telephone: telephone,
         typeUtilisateur: 'livreur',
         dateCreation: DateTime.now(),
-        additionalData: {
-          'nomComplet': nomComplet,
-          'numeroPermis': numeroPermis,
-          'typeVehicule': typeVehicule,
-          'numeroVehicule': numeroVehicule,
-        },
       );
       
-      if (!success) {
-        throw 'Erreur lors de la création du profil.';
-      }
-      
-      // Récupérer l'utilisateur depuis Firestore
-      final user = await FirebaseSimpleAuth.getUserFromFirestore(uid);
-      
-      if (user != null) {
-        _currentUser = user;
-        _userType = 'livreur';
-        _isLoading = false;
-        notifyListeners();
-        return true;
-      }
+      _currentUser = user;
+      _userType = 'livreur';
+      _isLoading = false;
+      notifyListeners();
+      return true;
     } catch (e) {
       _errorMessage = e.toString();
       print('Erreur dans AuthProvider inscriptionLivreur: $_errorMessage');

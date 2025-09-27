@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../services/firebase/pharmacie_service.dart';
 import '../../models/commande_model.dart';
+import 'attribution_livreur_screen.dart';
 
 class CommandesScreen extends StatefulWidget {
   const CommandesScreen({Key? key}) : super(key: key);
@@ -20,6 +21,9 @@ class _CommandesScreenState extends State<CommandesScreen>
     'validee': 'Validée',
     'en_preparation': 'En préparation',
     'prete': 'Prête',
+    'en_route_pharmacie': 'Livreur en route',
+    'recuperee': 'Récupérée',
+    'en_route_client': 'Vers le client',
     'en_livraison': 'En livraison',
     'livree': 'Livrée',
     'annulee': 'Annulée',
@@ -30,10 +34,13 @@ class _CommandesScreenState extends State<CommandesScreen>
     'en_attente': Colors.orange,
     'validee': Colors.blue,
     'en_preparation': Colors.purple,
-    'prete': Colors.green,
+    'prete': Colors.teal,
+    'en_route_pharmacie': Colors.lightBlue,
+    'recuperee': Colors.cyan,
+    'en_route_client': Colors.indigo,
     'en_livraison': Colors.indigo,
-    'livree': Colors.teal,
-    'annulee': Colors.red,
+    'livree': Colors.green,
+    'annulee': Colors.grey,
     'refusee': Colors.red,
   };
 
@@ -67,7 +74,7 @@ class _CommandesScreenState extends State<CommandesScreen>
         controller: _tabController,
         children: [
           _buildCommandesList(['en_attente']),
-          _buildCommandesList(['validee', 'en_preparation', 'prete', 'en_livraison']),
+          _buildCommandesList(['validee', 'en_preparation', 'prete', 'en_route_pharmacie', 'recuperee', 'en_route_client', 'en_livraison']),
           _buildCommandesList(['livree', 'annulee', 'refusee']),
           _buildCommandesList(null), // Toutes les commandes
         ],
@@ -140,12 +147,36 @@ class _CommandesScreenState extends State<CommandesScreen>
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 3,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
       child: ExpansionTile(
-        leading: CircleAvatar(
-          backgroundColor: statusColor.withOpacity(0.1),
+        leading: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                statusColor.withOpacity(0.8),
+                statusColor,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: statusColor.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 3),
+              ),
+            ],
+          ),
           child: Icon(
             _getStatusIcon(commande.statutCommande),
-            color: statusColor,
+            color: Colors.white,
+            size: 22,
           ),
         ),
         title: Text(
@@ -162,20 +193,40 @@ class _CommandesScreenState extends State<CommandesScreen>
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 2,
+                    horizontal: 10,
+                    vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    statusLabel,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: statusColor,
-                      fontWeight: FontWeight.bold,
+                    gradient: LinearGradient(
+                      colors: [
+                        statusColor.withOpacity(0.1),
+                        statusColor.withOpacity(0.2),
+                      ],
                     ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: statusColor.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _getStatusIcon(commande.statutCommande),
+                        size: 12,
+                        color: statusColor,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        statusLabel,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
                 const Spacer(),
@@ -349,22 +400,29 @@ class _CommandesScreenState extends State<CommandesScreen>
   IconData _getStatusIcon(String status) {
     switch (status) {
       case 'en_attente':
-        return Icons.pending;
+        return Icons.schedule;
       case 'validee':
-        return Icons.check;
-      case 'en_preparation':
-        return Icons.build;
-      case 'prete':
         return Icons.check_circle;
+      case 'en_preparation':
+        return Icons.medical_services;
+      case 'prete':
+        return Icons.inventory_2;
+      case 'en_route_pharmacie':
+        return Icons.directions_car;
+      case 'recuperee':
+        return Icons.inventory;
+      case 'en_route_client':
+        return Icons.navigation;
       case 'en_livraison':
         return Icons.local_shipping;
       case 'livree':
         return Icons.done_all;
       case 'annulee':
+        return Icons.cancel_outlined;
       case 'refusee':
-        return Icons.cancel;
+        return Icons.close_rounded;
       default:
-        return Icons.help;
+        return Icons.help_outline;
     }
   }
 
@@ -475,110 +533,24 @@ class _CommandesScreenState extends State<CommandesScreen>
     _showResultSnackbar(success, 'Statut mis à jour');
   }
 
-  void _assignLivreur(CommandeModel commande) {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return FutureBuilder<List<Map<String, dynamic>>>(
-          future: _getAvailableLivreurs(),
-          builder: (context, snapshot) {
-            if (snapshot.connectionState == ConnectionState.waiting) {
-              return const AlertDialog(
-                content: Center(child: CircularProgressIndicator()),
-              );
-            }
-            
-            if (!snapshot.hasData || snapshot.data!.isEmpty) {
-              return AlertDialog(
-                title: const Text('Aucun livreur disponible'),
-                content: const Text('Aucun livreur n\'est disponible pour le moment.'),
-                actions: [
-                  TextButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Fermer'),
-                  ),
-                ],
-              );
-            }
-            
-            final livreurs = snapshot.data!;
-            String? selectedLivreurId;
-            String? selectedLivreurNom;
-            
-            return StatefulBuilder(
-              builder: (context, setState) {
-                return AlertDialog(
-                  title: const Text('Attribuer un livreur'),
-                  content: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text('Sélectionnez un livreur pour cette commande:'),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: selectedLivreurId,
-                        decoration: const InputDecoration(
-                          labelText: 'Livreur',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: livreurs.map((livreur) {
-                          return DropdownMenuItem<String>(
-                            value: livreur['id'] as String,
-                            child: Text(livreur['nom'] as String),
-                          );
-                        }).toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            selectedLivreurId = value;
-                            selectedLivreurNom = livreurs
-                                .firstWhere((l) => l['id'] == value)['nom'];
-                          });
-                        },
-                      ),
-                    ],
-                  ),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Annuler'),
-                    ),
-                    ElevatedButton(
-                      onPressed: selectedLivreurId == null
-                          ? null
-                          : () async {
-                              final success = await _pharmacieService.attribuerLivreur(
-                                commande.id,
-                                selectedLivreurId!,
-                                selectedLivreurNom!,
-                              );
-                              Navigator.pop(context);
-                              _showResultSnackbar(success, 'Livreur attribué');
-                            },
-                      child: const Text('Attribuer'),
-                    ),
-                  ],
-                );
-              },
-            );
-          },
-        );
-      },
+  void _assignLivreur(CommandeModel commande) async {
+    final result = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AttributionLivreurScreen(commande: commande),
+      ),
     );
-  }
-
-  Future<List<Map<String, dynamic>>> _getAvailableLivreurs() async {
-    try {
-      // Pour le moment, on retourne une liste statique de livreurs
-      // Dans une vraie app, on récupérerait depuis Firestore
-      return [
-        {'id': 'livreur1', 'nom': 'Jean Dupont'},
-        {'id': 'livreur2', 'nom': 'Marie Martin'},
-        {'id': 'livreur3', 'nom': 'Pierre Durand'},
-      ];
-    } catch (e) {
-      print('Erreur lors de la récupération des livreurs: $e');
-      return [];
+    
+    if (result == true) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Commande attribuée avec succès !'),
+          backgroundColor: Colors.green,
+        ),
+      );
     }
   }
+
 
   void _showResultSnackbar(bool success, String message) {
     ScaffoldMessenger.of(context).showSnackBar(

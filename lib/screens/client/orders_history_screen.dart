@@ -11,7 +11,7 @@ class OrdersHistoryScreen extends StatefulWidget {
   _OrdersHistoryScreenState createState() => _OrdersHistoryScreenState();
 }
 
-class _OrdersHistoryScreenState extends State<OrdersHistoryScreen> 
+class _OrdersHistoryScreenState extends State<OrdersHistoryScreen>
     with TickerProviderStateMixin {
   final ClientService _clientService = ClientService();
   late TabController _tabController;
@@ -31,7 +31,7 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen>
   @override
   Widget build(BuildContext context) {
     final authProvider = context.watch<AuthProvider>();
-    
+
     return Scaffold(
       body: CustomScrollView(
         slivers: [
@@ -112,7 +112,7 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen>
                 // Commandes en cours
                 _buildOrdersList(
                   authProvider.currentUser?.id ?? '',
-                  ['en_attente', 'validee', 'en_preparation', 'prete', 'en_livraison'],
+                  ['en_attente', 'validee', 'en_preparation', 'prete', 'en_route_pharmacie', 'recuperee', 'en_route_client', 'en_livraison'],
                 ),
                 // Commandes terminées
                 _buildOrdersList(
@@ -170,7 +170,7 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen>
   Widget _buildEmptyState(List<String> statuts) {
     IconData icon;
     String message;
-    
+
     if (statuts.contains('en_attente')) {
       icon = Icons.shopping_bag_outlined;
       message = 'Aucune commande en cours';
@@ -261,7 +261,7 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen>
                   ],
                 ),
                 const Divider(height: 24),
-                
+
                 // Pharmacie
                 Row(
                   children: [
@@ -304,12 +304,12 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen>
                 const SizedBox(height: 12),
 
                 // Timeline de statut
-                if (commande.statutCommande != 'annulee' && 
+                if (commande.statutCommande != 'annulee' &&
                     commande.statutCommande != 'refusee')
                   _buildStatusTimeline(commande.statutCommande),
 
                 const SizedBox(height: 12),
-                
+
                 // Montant et action
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -383,7 +383,15 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen>
         label = 'Prête';
         icon = Icons.inventory_2;
         break;
+      case 'en_route_pharmacie':
+        bgColor = Colors.blue.shade50;
+        textColor = Colors.blue.shade700;
+        label = 'Livreur en route';
+        icon = Icons.directions_car;
+        break;
       case 'en_livraison':
+      case 'recuperee':
+      case 'en_route_client':
         bgColor = Colors.indigo.shade50;
         textColor = Colors.indigo.shade700;
         label = 'En livraison';
@@ -440,57 +448,129 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen>
 
   Widget _buildStatusTimeline(String currentStatus) {
     final steps = [
-      {'status': 'en_attente', 'label': 'En attente'},
-      {'status': 'validee', 'label': 'Validée'},
-      {'status': 'en_preparation', 'label': 'Préparation'},
-      {'status': 'prete', 'label': 'Prête'},
-      {'status': 'en_livraison', 'label': 'Livraison'},
-      {'status': 'livree', 'label': 'Livrée'},
+      {
+        'status': 'en_attente',
+        'label': 'En attente',
+        'icon': Icons.schedule,
+        'color': Colors.orange.shade600
+      },
+      {
+        'status': 'validee',
+        'label': 'Validée',
+        'icon': Icons.check_circle,
+        'color': Colors.blue.shade600
+      },
+      {
+        'status': 'en_preparation',
+        'label': 'Préparation',
+        'icon': Icons.medical_services,
+        'color': Colors.purple.shade600
+      },
+      {
+        'status': 'prete',
+        'label': 'Prête',
+        'icon': Icons.inventory_2,
+        'color': Colors.teal.shade600
+      },
+      {
+        'status': 'en_livraison',
+        'label': 'Livraison',
+        'icon': Icons.local_shipping,
+        'color': Colors.indigo.shade600
+      },
+      {
+        'status': 'livree',
+        'label': 'Livrée',
+        'icon': Icons.done_all,
+        'color': Colors.green.shade600
+      },
     ];
 
-    final currentIndex = steps.indexWhere((s) => s['status'] == currentStatus);
+    // Gestion des statuts spéciaux
+    String normalizedStatus = currentStatus;
+    if (['en_route_pharmacie', 'recuperee', 'en_route_client'].contains(currentStatus)) {
+      normalizedStatus = 'en_livraison';
+    }
+
+    final currentIndex = steps.indexWhere((s) => s['status'] == normalizedStatus);
 
     return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 12),
       child: Row(
         children: List.generate(steps.length * 2 - 1, (index) {
           if (index.isOdd) {
-            // Ligne de connexion
+            // Ligne de connexion animée
             final stepIndex = index ~/ 2;
             final isCompleted = stepIndex < currentIndex;
+            final isNext = stepIndex == currentIndex;
+
             return Expanded(
               child: Container(
-                height: 2,
-                color: isCompleted 
-                    ? Colors.green 
-                    : Colors.grey.shade300,
+                height: 3,
+                margin: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(2),
+                  gradient: isCompleted
+                      ? LinearGradient(
+                          colors: [
+                            Colors.green.shade400,
+                            Colors.green.shade600,
+                          ],
+                        )
+                      : isNext
+                          ? LinearGradient(
+                              colors: [
+                                Colors.green.shade300,
+                                Colors.grey.shade300,
+                              ],
+                            )
+                          : null,
+                  color: !isCompleted && !isNext ? Colors.grey.shade300 : null,
+                ),
               ),
             );
           } else {
-            // Cercle de statut
+            // Cercle de statut amélioré
             final stepIndex = index ~/ 2;
+            final step = steps[stepIndex];
             final isCompleted = stepIndex <= currentIndex;
             final isCurrent = stepIndex == currentIndex;
-            
+            final statusColor = step['color'] as Color;
+            final iconData = step['icon'] as IconData;
+
             return Container(
-              width: 20,
-              height: 20,
+              width: 32,
+              height: 32,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isCompleted 
-                    ? Colors.green 
-                    : Colors.grey.shade300,
-                border: isCurrent 
-                    ? Border.all(color: Colors.green, width: 3)
+                color: isCompleted
+                    ? statusColor
+                    : Colors.grey.shade200,
+                border: isCurrent
+                    ? Border.all(color: statusColor, width: 3)
+                    : Border.all(
+                        color: isCompleted ? statusColor : Colors.grey.shade300,
+                        width: 1.5,
+                      ),
+                boxShadow: isCompleted || isCurrent
+                    ? [
+                        BoxShadow(
+                          color: statusColor.withOpacity(0.3),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                        ),
+                      ]
                     : null,
               ),
-              child: isCompleted 
-                  ? const Icon(
-                      Icons.check,
-                      size: 12,
-                      color: Colors.white,
-                    )
-                  : null,
+              child: Icon(
+                isCompleted ? Icons.check : iconData,
+                size: isCompleted ? 16 : 14,
+                color: isCompleted
+                    ? Colors.white
+                    : isCurrent
+                        ? statusColor
+                        : Colors.grey.shade400,
+              ),
             );
           }
         }),
@@ -514,7 +594,7 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen>
   String _formatDate(DateTime date) {
     final now = DateTime.now();
     final difference = now.difference(date);
-    
+
     if (difference.inDays == 0) {
       return 'Aujourd\'hui à ${_formatTime(date)}';
     } else if (difference.inDays == 1) {
@@ -525,11 +605,11 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen>
       return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     }
   }
-  
+
   String _formatTime(DateTime date) {
     return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
   }
-  
+
   String _getWeekday(int weekday) {
     const weekdays = [
       'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'
@@ -569,7 +649,7 @@ class _OrdersHistoryScreenState extends State<OrdersHistoryScreen>
       try {
         await _clientService.annulerCommande(commande.id);
         Navigator.of(context).pop(); // Fermer le modal de détails
-        
+
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Commande annulée avec succès'),
@@ -602,7 +682,7 @@ class _OrderDetailsModal extends StatefulWidget {
   _OrderDetailsModalState createState() => _OrderDetailsModalState();
 }
 
-class _OrderDetailsModalState extends State<_OrderDetailsModal> 
+class _OrderDetailsModalState extends State<_OrderDetailsModal>
     with TickerProviderStateMixin {
   late TabController _tabController;
 
@@ -641,7 +721,7 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
               borderRadius: BorderRadius.circular(2),
             ),
           ),
-          
+
           // Header
           Container(
             padding: const EdgeInsets.all(20),
@@ -675,7 +755,7 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
               ],
             ),
           ),
-          
+
           // Tabs
           Container(
             decoration: BoxDecoration(
@@ -701,7 +781,7 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
               ],
             ),
           ),
-          
+
           // Contenu des tabs
           Expanded(
             child: TabBarView(
@@ -745,7 +825,7 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
               ],
             ),
           ),
-          
+
           // Pharmacie
           _buildDetailSection(
             'Pharmacie',
@@ -788,7 +868,7 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
               ],
             ),
           ),
-          
+
           // Articles
           _buildDetailSection(
             'Articles (${widget.commande.items.length})',
@@ -843,7 +923,7 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
               }).toList(),
             ),
           ),
-          
+
           // Livraison
           if (widget.commande.typeLivraison != null)
             _buildDetailSection(
@@ -854,8 +934,8 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
                   Row(
                     children: [
                       Icon(
-                        widget.commande.typeLivraison == 'express' 
-                            ? Icons.rocket_launch 
+                        widget.commande.typeLivraison == 'express'
+                            ? Icons.rocket_launch
                             : Icons.local_shipping,
                         size: 20,
                         color: Colors.green.shade600,
@@ -879,7 +959,7 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
                 ],
               ),
             ),
-          
+
           // Paiement
           _buildDetailSection(
             'Paiement',
@@ -925,7 +1005,7 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
               ],
             ),
           ),
-          
+
           // Total
           Container(
             margin: const EdgeInsets.only(top: 20),
@@ -955,7 +1035,7 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
               ],
             ),
           ),
-          
+
           // Actions selon le statut
           if (widget.commande.statutCommande == 'en_attente' ||
               widget.commande.statutCommande == 'validee')
@@ -991,9 +1071,9 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
             'Suivi de la commande',
             child: _buildDetailedTimeline(),
           ),
-          
+
           const SizedBox(height: 20),
-          
+
           // Informations de livraison
           if (widget.commande.livreurNom != null)
             _buildDetailSection(
@@ -1036,7 +1116,7 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
                 ],
               ),
             ),
-          
+
           // Date de commande
           _buildDetailSection(
             'Dates importantes',
@@ -1065,7 +1145,7 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
               ],
             ),
           ),
-          
+
           // Note de validation
           if (widget.commande.noteValidation != null)
             _buildDetailSection(
@@ -1094,41 +1174,53 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
         'label': 'En attente',
         'description': 'Commande transmise à la pharmacie',
         'icon': Icons.schedule,
+        'color': Colors.orange.shade600,
       },
       {
         'status': 'validee',
         'label': 'Validée',
         'description': 'Pharmacie a validé votre commande',
         'icon': Icons.check_circle,
+        'color': Colors.blue.shade600,
       },
       {
         'status': 'en_preparation',
         'label': 'En préparation',
         'description': 'Médicaments en cours de préparation',
-        'icon': Icons.pending_actions,
+        'icon': Icons.medical_services,
+        'color': Colors.purple.shade600,
       },
       {
         'status': 'prete',
         'label': 'Prête',
         'description': 'Commande prête pour livraison',
         'icon': Icons.inventory_2,
+        'color': Colors.teal.shade600,
       },
       {
         'status': 'en_livraison',
         'label': 'En livraison',
         'description': 'Livreur en route vers vous',
         'icon': Icons.local_shipping,
+        'color': Colors.indigo.shade600,
       },
       {
         'status': 'livree',
         'label': 'Livrée',
         'description': 'Commande livrée avec succès',
-        'icon': Icons.check_circle,
+        'icon': Icons.done_all,
+        'color': Colors.green.shade600,
       },
     ];
 
-    final currentIndex = steps.indexWhere((s) => s['status'] == widget.commande.statutCommande);
-    
+    // Gestion des statuts spéciaux
+    String normalizedStatus = widget.commande.statutCommande;
+    if (['en_route_pharmacie', 'recuperee', 'en_route_client'].contains(widget.commande.statutCommande)) {
+      normalizedStatus = 'en_livraison';
+    }
+
+    final currentIndex = steps.indexWhere((s) => s['status'] == normalizedStatus);
+
     return Column(
       children: steps.asMap().entries.map((entry) {
         final index = entry.key;
@@ -1136,64 +1228,208 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
         final isCompleted = index <= currentIndex;
         final isCurrent = index == currentIndex;
         final isLast = index == steps.length - 1;
-        
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Timeline indicator
-            Column(
-              children: [
-                Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: isCompleted ? Colors.green : Colors.grey.shade300,
-                    border: isCurrent ? Border.all(color: Colors.green, width: 3) : null,
-                  ),
-                  child: Icon(
-                    step['icon'] as IconData,
-                    size: 20,
-                    color: isCompleted ? Colors.white : Colors.grey.shade600,
-                  ),
-                ),
-                if (!isLast)
+        final stepColor = step['color'] as Color;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Timeline indicator amélioré
+              Column(
+                children: [
                   Container(
-                    width: 2,
-                    height: 40,
-                    color: isCompleted ? Colors.green : Colors.grey.shade300,
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: isCompleted ? stepColor : Colors.grey.shade200,
+                      border: isCurrent
+                          ? Border.all(color: stepColor, width: 3)
+                          : Border.all(
+                              color: isCompleted ? stepColor : Colors.grey.shade300,
+                              width: 1.5,
+                            ),
+                      boxShadow: isCompleted || isCurrent
+                          ? [
+                              BoxShadow(
+                                color: stepColor.withOpacity(0.3),
+                                blurRadius: 12,
+                                spreadRadius: 2,
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Icon(
+                      isCompleted ? Icons.check : step['icon'] as IconData,
+                      size: isCompleted ? 24 : 20,
+                      color: isCompleted
+                          ? Colors.white
+                          : isCurrent
+                              ? stepColor
+                              : Colors.grey.shade500,
+                    ),
                   ),
-              ],
-            ),
-            const SizedBox(width: 16),
-            // Content
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 20),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      step['label'] as String,
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                        color: isCompleted ? Colors.green.shade700 : Colors.grey.shade600,
+                  if (!isLast)
+                    Container(
+                      width: 3,
+                      height: 50,
+                      margin: const EdgeInsets.symmetric(vertical: 4),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(2),
+                        gradient: isCompleted
+                            ? LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: [
+                                  stepColor,
+                                  stepColor.withOpacity(0.7),
+                                ],
+                              )
+                            : null,
+                        color: !isCompleted ? Colors.grey.shade300 : null,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      step['description'] as String,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey.shade600,
+                ],
+              ),
+              const SizedBox(width: 16),
+              // Content amélioré
+              Expanded(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
+                  decoration: BoxDecoration(
+                    color: isCompleted
+                        ? stepColor.withOpacity(0.1)
+                        : isCurrent
+                            ? stepColor.withOpacity(0.05)
+                            : Colors.grey.shade50,
+                    borderRadius: BorderRadius.circular(12),
+                    border: isCurrent
+                        ? Border.all(color: stepColor.withOpacity(0.3), width: 1.5)
+                        : Border.all(color: Colors.grey.shade200, width: 1),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              step['label'] as String,
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                                color: isCompleted
+                                    ? stepColor
+                                    : isCurrent
+                                        ? stepColor
+                                        : Colors.grey.shade600,
+                              ),
+                            ),
+                          ),
+                          if (isCompleted)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: stepColor,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'Terminé',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            )
+                          else if (isCurrent)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: stepColor.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                'En cours',
+                                style: TextStyle(
+                                  color: stepColor,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
-                  ],
+                      const SizedBox(height: 4),
+                      Text(
+                        step['description'] as String,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isCompleted
+                              ? stepColor
+                              : Colors.grey.shade600,
+                        ),
+                      ),
+                      // Informations spéciales pour certains statuts
+                      if (isCurrent && widget.commande.statutCommande == 'en_route_pharmacie')
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.blue.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.directions_car,
+                                     size: 16, color: Colors.blue.shade600),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Le livreur se dirige vers la pharmacie',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.blue.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (isCurrent && widget.commande.statutCommande == 'en_route_client')
+                        Padding(
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.indigo.shade50,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Row(
+                              children: [
+                                Icon(Icons.navigation,
+                                     size: 16, color: Colors.indigo.shade600),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Le livreur arrive vers vous',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.indigo.shade700,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         );
       }).toList(),
     );
@@ -1282,7 +1518,15 @@ class _OrderDetailsModalState extends State<_OrderDetailsModal>
         label = 'Prête';
         icon = Icons.inventory_2;
         break;
+      case 'en_route_pharmacie':
+        bgColor = Colors.blue.shade50;
+        textColor = Colors.blue.shade700;
+        label = 'Livreur en route';
+        icon = Icons.directions_car;
+        break;
       case 'en_livraison':
+      case 'recuperee':
+      case 'en_route_client':
         bgColor = Colors.indigo.shade50;
         textColor = Colors.indigo.shade700;
         label = 'En livraison';

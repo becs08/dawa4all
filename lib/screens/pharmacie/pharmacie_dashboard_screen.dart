@@ -5,6 +5,7 @@ import '../../providers/notification_provider.dart';
 import '../../services/firebase/pharmacie_service.dart';
 import 'medicaments_screen.dart';
 import 'commandes_screen.dart';
+import 'livreurs_screen.dart';
 import 'profile_screen.dart';
 
 class PharmacieDashboardScreen extends StatefulWidget {
@@ -21,6 +22,7 @@ class _PharmacieDashboardScreenState extends State<PharmacieDashboardScreen> {
     const _DashboardHomeWidget(),
     const MedicamentsScreen(),
     const CommandesScreen(),
+    const LivreursScreen(),
     const ProfileScreen(),
   ];
 
@@ -48,6 +50,10 @@ class _PharmacieDashboardScreenState extends State<PharmacieDashboardScreen> {
           BottomNavigationBarItem(
             icon: Icon(Icons.shopping_bag),
             label: 'Commandes',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.delivery_dining),
+            label: 'Livreurs',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person),
@@ -999,6 +1005,9 @@ class _DashboardHomeWidgetState extends State<_DashboardHomeWidget> {
       case 'validee': return Colors.blue;
       case 'en_preparation': return Colors.purple;
       case 'prete': return Colors.green;
+      case 'en_route_pharmacie': return Colors.lightBlue;
+      case 'recuperee': return Colors.cyan;
+      case 'en_route_client':
       case 'en_livraison': return Colors.indigo;
       case 'livree': return Colors.teal;
       case 'annulee':
@@ -1013,6 +1022,9 @@ class _DashboardHomeWidgetState extends State<_DashboardHomeWidget> {
       case 'validee': return 'Validée';
       case 'en_preparation': return 'Préparation';
       case 'prete': return 'Prête';
+      case 'en_route_pharmacie': return 'Livreur en route';
+      case 'recuperee': return 'Récupérée';
+      case 'en_route_client': return 'Chez client';
       case 'en_livraison': return 'Livraison';
       case 'livree': return 'Livrée';
       case 'annulee': return 'Annulée';

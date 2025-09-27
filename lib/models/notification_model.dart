@@ -14,6 +14,8 @@ enum NotificationType {
   stockFaible,
   rappel,
   systeme,
+  nouvelleLivraison,
+  livreurAttribue,
 }
 
 // Modèle pour les notifications
@@ -156,6 +158,10 @@ class NotificationModel {
         return '🔔';
       case NotificationType.systeme:
         return '📢';
+      case NotificationType.nouvelleLivraison:
+        return '🚚';
+      case NotificationType.livreurAttribue:
+        return '👨‍💼';
     }
   }
 

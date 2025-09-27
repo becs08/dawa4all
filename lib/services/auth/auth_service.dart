@@ -305,10 +305,25 @@ class AuthService {
       final livreur = LivreurModel(
         id: uid,
         userId: uid,
+        nom: nomComplet.split(' ').first,
+        prenom: nomComplet.split(' ').length > 1 ? nomComplet.split(' ').skip(1).join(' ') : '',
+        email: email,
+        telephone: telephone,
+        adresse: '',
+        ville: '',
+        cni: '',
         nomComplet: nomComplet,
         numeroPermis: numeroPermis,
         typeVehicule: typeVehicule,
         numeroVehicule: numeroVehicule,
+        plaqueVehicule: numeroVehicule,
+        estDisponible: false,
+        statut: 'en_attente_validation',
+        note: 0.0,
+        nombreLivraisons: 0,
+        nombreAvis: 0,
+        dateInscription: DateTime.now(),
+        derniereActivite: DateTime.now(),
       );
 
       // Sauvegarder dans Firestore

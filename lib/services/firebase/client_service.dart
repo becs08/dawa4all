@@ -102,21 +102,36 @@ class ClientService {
         print('⚠️ Erreur récupération téléphone: $e');
       }
       
+      // Créer la liste des médicaments au format Map
+      final medicamentsList = items.map((item) => {
+        'nom': item.medicamentNom,
+        'prix': item.prix,
+        'quantite': item.quantite,
+        'medicamentId': item.medicamentId,
+      }).toList();
+
       final commande = CommandeModel(
         id: commandeId,
         clientId: clientId,
-        clientNom: client.nomComplet,
+        clientNom: client.nomComplet.split(' ').first,
+        clientPrenom: client.nomComplet.split(' ').length > 1 ? client.nomComplet.split(' ').skip(1).join(' ') : '',
         clientTelephone: clientTelephone,
         clientAdresse: '${client.adresse}, ${client.ville}',
+        adresseLivraison: '${client.adresse}, ${client.ville}',
         clientLocalisation: client.localisation ?? GeoPoint(0, 0),
+        clientPosition: client.localisation,
         pharmacieId: pharmacieId,
         pharmacieNom: pharmacie.nomPharmacie,
         pharmacieAdresse: '${pharmacie.adresse}, ${pharmacie.ville}',
         pharmacieLocalisation: pharmacie.localisation,
+        pharmaciePosition: pharmacie.localisation,
         items: items,
+        medicaments: medicamentsList,
         montantTotal: montantTotal,
+        total: montantTotal + fraisLivraison,
         fraisLivraison: fraisLivraison,
         statutCommande: 'en_attente',
+        statut: 'en_attente',
         dateCommande: DateTime.now(),
         modePaiement: modePaiement,
         paiementEffectue: paiementEffectue,

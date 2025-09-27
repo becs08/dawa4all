@@ -5,17 +5,24 @@ class CommandeModel {
   final String id;
   final String clientId;
   final String clientNom;
+  final String clientPrenom;
   final String clientTelephone;
   final String clientAdresse;
+  final String adresseLivraison;
   final GeoPoint clientLocalisation;
+  final GeoPoint? clientPosition;
   final String pharmacieId;
   final String pharmacieNom;
   final String pharmacieAdresse;
   final GeoPoint pharmacieLocalisation;
+  final GeoPoint? pharmaciePosition;
   final List<ItemCommande> items;
+  final List<Map<String, dynamic>> medicaments;
   final double montantTotal;
+  final double total;
   final double fraisLivraison;
   final String statutCommande; // 'en_attente', 'validee', 'refusee', 'en_livraison', 'livree'
+  final String statut; // Alias pour statutCommande
   final String? livreurId;
   final String? livreurNom;
   final DateTime dateCommande;
@@ -35,17 +42,24 @@ class CommandeModel {
     required this.id,
     required this.clientId,
     required this.clientNom,
+    required this.clientPrenom,
     required this.clientTelephone,
     required this.clientAdresse,
+    required this.adresseLivraison,
     required this.clientLocalisation,
+    this.clientPosition,
     required this.pharmacieId,
     required this.pharmacieNom,
     required this.pharmacieAdresse,
     required this.pharmacieLocalisation,
+    this.pharmaciePosition,
     required this.items,
+    required this.medicaments,
     required this.montantTotal,
+    required this.total,
     required this.fraisLivraison,
     required this.statutCommande,
+    required this.statut,
     this.livreurId,
     this.livreurNom,
     required this.dateCommande,
@@ -67,17 +81,24 @@ class CommandeModel {
       'id': id,
       'clientId': clientId,
       'clientNom': clientNom,
+      'clientPrenom': clientPrenom,
       'clientTelephone': clientTelephone,
       'clientAdresse': clientAdresse,
+      'adresseLivraison': adresseLivraison,
       'clientLocalisation': clientLocalisation,
+      'clientPosition': clientPosition,
       'pharmacieId': pharmacieId,
       'pharmacieNom': pharmacieNom,
       'pharmacieAdresse': pharmacieAdresse,
       'pharmacieLocalisation': pharmacieLocalisation,
+      'pharmaciePosition': pharmaciePosition,
       'items': items.map((item) => item.toMap()).toList(),
+      'medicaments': medicaments,
       'montantTotal': montantTotal,
+      'total': total,
       'fraisLivraison': fraisLivraison,
       'statutCommande': statutCommande,
+      'statut': statut,
       'livreurId': livreurId,
       'livreurNom': livreurNom,
       'dateCommande': Timestamp.fromDate(dateCommande),
@@ -96,23 +117,35 @@ class CommandeModel {
   }
 
   factory CommandeModel.fromMap(Map<String, dynamic> map, [String? documentId]) {
+    final statutCommande = map['statutCommande'] ?? map['statut'] ?? 'en_attente';
+    final medicamentsList = map['medicaments'] != null 
+        ? List<Map<String, dynamic>>.from(map['medicaments']) 
+        : <Map<String, dynamic>>[];
+    
     return CommandeModel(
       id: documentId ?? map['id'] ?? '',
       clientId: map['clientId'] ?? '',
       clientNom: map['clientNom'] ?? '',
+      clientPrenom: map['clientPrenom'] ?? '',
       clientTelephone: map['clientTelephone'] ?? '',
       clientAdresse: map['clientAdresse'] ?? '',
+      adresseLivraison: map['adresseLivraison'] ?? map['clientAdresse'] ?? '',
       clientLocalisation: map['clientLocalisation'],
+      clientPosition: map['clientPosition'],
       pharmacieId: map['pharmacieId'] ?? '',
       pharmacieNom: map['pharmacieNom'] ?? '',
       pharmacieAdresse: map['pharmacieAdresse'] ?? '',
       pharmacieLocalisation: map['pharmacieLocalisation'],
+      pharmaciePosition: map['pharmaciePosition'],
       items: List<ItemCommande>.from(
         (map['items'] ?? []).map((item) => ItemCommande.fromMap(item)),
       ),
-      montantTotal: (map['montantTotal'] ?? 0).toDouble(),
+      medicaments: medicamentsList,
+      montantTotal: (map['montantTotal'] ?? map['total'] ?? 0).toDouble(),
+      total: (map['total'] ?? map['montantTotal'] ?? 0).toDouble(),
       fraisLivraison: (map['fraisLivraison'] ?? 0).toDouble(),
-      statutCommande: map['statutCommande'] ?? 'en_attente',
+      statutCommande: statutCommande,
+      statut: statutCommande,
       livreurId: map['livreurId'],
       livreurNom: map['livreurNom'],
       dateCommande: (map['dateCommande'] as Timestamp).toDate(),
@@ -139,10 +172,14 @@ class CommandeModel {
   }
 
   // Factory constructor for Firestore documents
-  factory CommandeModel.fromFirestore(DocumentSnapshot doc) {
+  factory CommandeModel.fromFirestore(Map<String, dynamic> data, String docId) {
+    return CommandeModel.fromMap(data, docId);
+  }
+
+  // Alternative factory constructor
+  factory CommandeModel.fromDoc(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    data['id'] = doc.id;
-    return CommandeModel.fromMap(data);
+    return CommandeModel.fromMap(data, doc.id);
   }
 
   // Calculer le montant total (médicaments + livraison)

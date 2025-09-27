@@ -14,6 +14,9 @@ class _RegisterLivreurScreenState extends State<RegisterLivreurScreen> {
   final _nomController = TextEditingController();
   final _emailController = TextEditingController();
   final _telephoneController = TextEditingController();
+  final _adresseController = TextEditingController();
+  final _villeController = TextEditingController();
+  final _cniController = TextEditingController();
   final _numeroPermisController = TextEditingController();
   final _numeroVehiculeController = TextEditingController();
   final _passwordController = TextEditingController();
@@ -36,6 +39,9 @@ class _RegisterLivreurScreenState extends State<RegisterLivreurScreen> {
     _nomController.dispose();
     _emailController.dispose();
     _telephoneController.dispose();
+    _adresseController.dispose();
+    _villeController.dispose();
+    _cniController.dispose();
     _numeroPermisController.dispose();
     _numeroVehiculeController.dispose();
     _passwordController.dispose();
@@ -173,6 +179,85 @@ class _RegisterLivreurScreenState extends State<RegisterLivreurScreen> {
                         validator: (value) {
                           if (value == null || value.isEmpty) {
                             return 'Téléphone requis';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 30),
+
+                // Section Adresse
+                const Text(
+                  'Adresse',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2E7D32),
+                  ),
+                ),
+                const SizedBox(height: 16),
+
+                // Adresse complète
+                TextFormField(
+                  controller: _adresseController,
+                  decoration: InputDecoration(
+                    labelText: 'Adresse complète',
+                    prefixIcon: const Icon(Icons.home),
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Adresse requise';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextFormField(
+                        controller: _villeController,
+                        decoration: InputDecoration(
+                          labelText: 'Ville',
+                          prefixIcon: const Icon(Icons.location_city),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Ville requise';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: TextFormField(
+                        controller: _cniController,
+                        decoration: InputDecoration(
+                          labelText: 'CNI',
+                          prefixIcon: const Icon(Icons.credit_card_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                          fillColor: Colors.grey[50],
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'CNI requise';
                           }
                           return null;
                         },
@@ -408,6 +493,9 @@ class _RegisterLivreurScreenState extends State<RegisterLivreurScreen> {
                                     password: _passwordController.text,
                                     nomComplet: _nomController.text.trim(),
                                     telephone: _telephoneController.text.trim(),
+                                    adresse: _adresseController.text.trim(),
+                                    ville: _villeController.text.trim(),
+                                    cni: _cniController.text.trim(),
                                     numeroPermis: _numeroPermisController.text.trim(),
                                     typeVehicule: _typeVehicule,
                                     numeroVehicule: _numeroVehiculeController.text.trim(),
